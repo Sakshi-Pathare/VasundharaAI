@@ -67,25 +67,25 @@ export function UserDashboard() {
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-[#DEF5F1] text-[#092421] mb-2 border border-[#98E0D5] shadow-xs">
             <Award className="w-3.5 h-3.5 text-[#1B4A45]" />
-            <span>Civic Environmental Contributor • Tier 2</span>
+            <span>Steward • Tier 2</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#10241B] tracking-tight">
-            Reporter Command Dashboard
+            Steward Dashboard
           </h1>
           <p className="text-xs sm:text-sm text-[#556E55] mt-1 max-w-xl font-medium">
-            Track your submitted pollution incidents, municipal verification status, and cleanup progress in real time.
+            Track your pollution reports, verification statuses, and cleanup progress.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Link to="/report">
             <Button variant="pista" size="md" icon={Camera} glow className="shadow-lg rounded-full px-5 py-2.5 font-black hover:scale-105 active:scale-95 transition-all">
-              Report Litter Incident
+              Report Incident
             </Button>
           </Link>
           <Link to="/map">
             <Button variant="outline" size="md" icon={Compass} className="rounded-full px-5 py-2.5 font-bold">
-              View Live Map
+              Explore Map
             </Button>
           </Link>
         </div>
@@ -103,12 +103,12 @@ export function UserDashboard() {
             </span>
           </div>
           <p className="text-xs text-[#242D2B] font-medium">
-            Active steward in <b className="text-[#10241B]">{user?.municipalityName || 'Pune Municipal Corporation'}</b>. Ranked in top 8% of civic contributors.
+            Steward in <b className="text-[#10241B]">{user?.municipalityName || 'Pune Municipal Corporation'}</b> • Top 8% civic rank
           </p>
           <div className="pt-2 flex items-center gap-4 text-xs font-mono">
             <span className="text-[#10241B] font-bold">{ecoPoints} Eco Points</span>
             <span className="text-[#8FA88F]">•</span>
-            <span className="text-[#556E55] font-medium">{nextTierPoints - ecoPoints} pts to Tier 3 Guardian</span>
+            <span className="text-[#556E55] font-medium">{nextTierPoints - ecoPoints} pts to Tier 3</span>
           </div>
         </div>
 
@@ -118,7 +118,7 @@ export function UserDashboard() {
             <span className="text-[#10241B]">Tier 2 Progress</span>
             <span className="text-[#2D6A4F] font-mono font-bold">{tierProgress}%</span>
           </div>
-          <div className="w-full h-3 bg-[#EFE3D5] rounded-full overflow-hidden p-0.5 border border-[#D3BCA6]">
+          <div className="w-full h-3 bg-[#E5EDE5] rounded-full overflow-hidden p-0.5 border border-sage-300">
             <div
               className="h-full bg-gradient-to-r from-[#10241B] via-[#2D6A4F] to-[#74D7CB] rounded-full transition-all duration-700"
               style={{ width: `${tierProgress}%` }}
@@ -130,31 +130,31 @@ export function UserDashboard() {
       {/* KPI Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatWidget
-          title="Total Reports Logged"
+          title="Total Reports"
           value={totalReports}
-          subtext="Contributions to civic registry"
+          subtext="Logged submissions"
           icon={Layers}
           colorScheme="forest"
         />
         <StatWidget
-          title="Cleaned & Restored"
+          title="Resolved"
           value={cleanedReports}
-          subtext={`${totalReports > 0 ? Math.round((cleanedReports / totalReports) * 100) : 0}% verified resolution`}
+          subtext={`${totalReports > 0 ? Math.round((cleanedReports / totalReports) * 100) : 0}% verified cleanups`}
           icon={CheckCircle2}
           colorScheme="forest"
           trend="+1 this week"
         />
         <StatWidget
-          title="In Municipal Pipeline"
+          title="In Progress"
           value={inProgressReports}
-          subtext="Scheduled for sanitation crew"
+          subtext="Scheduled for sanitation"
           icon={Clock}
           colorScheme="blue"
         />
         <StatWidget
-          title="Est. Waste Diverted"
+          title="Waste Diverted"
           value={`${totalEstimatedKg.toFixed(1)} kg`}
-          subtext="Total environmental footprint"
+          subtext="Estimated footprint"
           icon={Sparkles}
           colorScheme="lime"
         />
@@ -165,9 +165,9 @@ export function UserDashboard() {
         {/* Left Column: Recent Submissions */}
         <div className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-serif font-bold text-[#10241B]">Recent Litter Submissions</h2>
+            <h2 className="text-xl font-serif font-bold text-[#10241B]">Recent Reports</h2>
             <Link to="/my-reports" className="text-xs text-[#1B4332] hover:text-[#10241B] font-bold flex items-center gap-1">
-              View all reports <ArrowRight className="w-3.5 h-3.5" />
+              View all <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
@@ -176,8 +176,8 @@ export function UserDashboard() {
           ) : reports.length === 0 ? (
             <EmptyState
               icon={Layers}
-              title="No litter reports yet"
-              description="You have not submitted any litter reports. Help clean up your community by photographing public pollution."
+              title="No reports submitted yet"
+              description="Photograph and report public pollution in your neighborhood to start tracking cleanups."
               actionLabel="Report Your First Incident"
               onAction={() => window.location.href = '/report'}
             />

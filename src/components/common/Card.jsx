@@ -58,7 +58,7 @@ export function CardBody({ children, className }) {
 
 export function CardFooter({ children, className }) {
   return (
-    <div className={twMerge(clsx('px-5 sm:px-6 py-4 bg-[#F7EFE6]/70 border-t border-[#1B4332]/10 text-xs text-[#556E55] flex items-center justify-between font-medium', className))}>
+    <div className={twMerge(clsx('px-5 sm:px-6 py-4 bg-[#F8FAF5]/90 border-t border-[#1B4332]/10 text-xs text-[#2D6A4F] flex items-center justify-between font-medium', className))}>
       {children}
     </div>
   );

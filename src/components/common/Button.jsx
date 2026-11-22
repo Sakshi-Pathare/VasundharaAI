@@ -17,14 +17,14 @@ export function Button({
   const baseStyles = 'inline-flex items-center justify-center font-bold transition-all duration-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none relative overflow-hidden group active:scale-[0.98] font-sans';
 
   const variants = {
-    primary: 'bg-gradient-to-r from-[#092421] via-[#123632] to-[#092421] text-beige-50 hover:from-[#051412] hover:to-[#092421] focus:ring-pista-400 shadow-soft-sm hover:shadow-[0_4px_20px_rgba(9,36,33,0.25)] border border-[#27403C] hover:border-[#74D7CB]/40',
-    secondary: 'bg-sage-100 text-darkgreen-950 hover:bg-sage-200 active:bg-sage-300 focus:ring-sage-400 border border-sage-300/80 shadow-soft-xs',
+    primary: 'bg-gradient-to-r from-[#1B4332] via-[#2D6A4F] to-[#1B4332] text-white hover:from-[#143225] hover:to-[#245741] focus:ring-[#2D6A4F] shadow-sm hover:shadow-[0_4px_16px_rgba(27,67,50,0.22)] border border-[#2D6A4F]/60',
+    secondary: 'bg-sage-100 text-[#1B4332] hover:bg-sage-200 active:bg-sage-300 focus:ring-sage-400 border border-sage-300/80 shadow-soft-xs font-semibold',
     pista: 'bg-[#74D7CB] hover:bg-[#51C4B5] text-[#092421] font-black focus:ring-pista-400 border border-[#98E0D5] shadow-[0_2px_14px_rgba(116,215,203,0.35)]',
-    outline: 'border border-beige-300 text-darkgreen-950 bg-beige-50/90 backdrop-blur-sm hover:bg-beige-100 hover:border-darkgreen-700 active:bg-beige-200 focus:ring-darkgreen-600 shadow-soft-xs hover:shadow-soft-sm',
-    ghost: 'text-darkgreen-900 hover:bg-sage-100/70 active:bg-sage-200 focus:ring-darkgreen-500',
+    outline: 'border border-[#1B4332]/20 text-[#1B4332] bg-white/80 backdrop-blur-sm hover:bg-sage-50 hover:border-[#1B4332] active:bg-sage-100 focus:ring-[#2D6A4F] shadow-soft-xs hover:shadow-soft-sm font-semibold',
+    ghost: 'text-[#1B4332] hover:bg-sage-100/70 active:bg-sage-200 focus:ring-[#2D6A4F] font-semibold',
     danger: 'bg-gradient-to-r from-rose-600 to-rose-700 text-white hover:from-rose-700 hover:to-rose-800 focus:ring-rose-500 shadow-soft-sm hover:shadow-soft-md border border-rose-500/40',
     lime: 'bg-[#74D7CB] hover:bg-[#51C4B5] text-[#092421] font-black hover:shadow-soft-md border border-[#98E0D5] shadow-soft focus:ring-pista-400',
-    glass: 'bg-beige-50/80 backdrop-blur-md text-darkgreen-950 border border-beige-300 hover:bg-white hover:border-[#74D7CB]/60 shadow-glass',
+    glass: 'bg-white/85 backdrop-blur-md text-[#1B4332] border border-[#1B4332]/15 hover:bg-white hover:border-[#2D6A4F] shadow-sm font-semibold',
   };
 
   const sizes = {

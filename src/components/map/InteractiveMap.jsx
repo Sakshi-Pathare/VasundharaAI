@@ -186,7 +186,7 @@ export function InteractiveMap({
             className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-soft backdrop-blur-md border ${
               userLocation
                 ? 'bg-[#102D27] text-[#74D7CB] border-[#74D7CB]/60 hover:bg-[#1B4A45]'
-                : 'bg-white/95 text-[#092421] border-[#1B4332]/20 hover:bg-[#FAF8F3]'
+                : 'bg-white/95 text-[#092421] border-[#1B4332]/20 hover:bg-[#F4F7F2]'
             }`}
             title="Recenter on your real-time current location"
           >

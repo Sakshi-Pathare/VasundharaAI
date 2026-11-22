@@ -148,6 +148,11 @@ export default {
         brand: {
           dark: '#10241B',
           deep: '#1B4332',
+          forest: '#1B4332',
+          deepgreen: '#2D6A4F',
+          sage: '#A3B18A',
+          mint: '#DDE8D5',
+          offwhite: '#F8FAF5',
           light: '#2D6A4F',
           pista: '#74D7CB',
           emerald: '#34D399',

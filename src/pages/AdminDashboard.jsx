@@ -121,23 +121,23 @@ export function AdminDashboard() {
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-[#DEF5F1] text-[#092421] mb-2 border border-[#98E0D5] shadow-xs">
             <ShieldCheck className="w-3.5 h-3.5 text-[#1B4A45]" />
-            <span>Municipal Sanitation Command Center</span>
+            <span>Command Center</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#10241B] tracking-tight">
-            City Environmental Intelligence Overview
+            Municipal Overview
           </h1>
           <p className="text-xs sm:text-sm text-[#556E55] mt-1 max-w-xl font-medium">
-            Supervise incoming litter reports, verify photographic evidence, monitor algorithmic recurrence corridors, and dispatch sanitation squads.
+            Review reports, verify photographic evidence, and dispatch cleanup squads.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={loadAllData} className="shadow-xs font-bold rounded-full px-4 py-2">
-            Refresh Telemetry
+            Refresh
           </Button>
           <Link to="/hotspots">
             <Button variant="pista" size="sm" icon={Flame} glow className="shadow-lg font-black rounded-full px-4 py-2">
-              Hotspot Hub
+              Hotspots Hub
             </Button>
           </Link>
         </div>
@@ -153,31 +153,31 @@ export function AdminDashboard() {
       {/* KPI Widgets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatWidget
-          title="Total Reports Logged"
+          title="Total Reports"
           value={metrics?.totalReports || 0}
-          subtext="City-wide public submissions"
+          subtext="City-wide submissions"
           icon={BarChart3}
           colorScheme="forest"
           trend="+18% vs last cycle"
         />
         <StatWidget
-          title="Pending Municipal Review"
+          title="Pending Review"
           value={metrics?.pendingReports || 0}
-          subtext="Awaiting officer verification"
+          subtext="Awaiting verification"
           icon={Clock}
           colorScheme="amber"
         />
         <StatWidget
-          title="Verified & Active"
+          title="Verified"
           value={metrics?.verifiedReports || 0}
-          subtext="Confirmed photographic evidence"
+          subtext="Confirmed evidence"
           icon={ShieldCheck}
           colorScheme="blue"
         />
         <StatWidget
-          title="Completed Cleanups"
+          title="Cleanups Completed"
           value={metrics?.completedCleanups || 0}
-          subtext="Sites cleared and certified"
+          subtext="Sites certified"
           icon={CheckCircle}
           colorScheme="forest"
           trend="+32 sites"
@@ -190,8 +190,8 @@ export function AdminDashboard() {
         <div className="lg:col-span-8">
           <Card className="border-sage-200/90 shadow-soft">
             <CardHeader
-              title="Pollution Incidence & Resolution Trajectory"
-              subtitle="6-Month historical reports filed vs verified municipal cleanups"
+              title="Incidence & Resolution Trends"
+              subtitle="6-Month historical reports vs verified cleanups"
               icon={Activity}
             />
             <CardBody>
@@ -208,13 +208,13 @@ export function AdminDashboard() {
                         <stop offset="95%" stopColor="#74D7CB" stopOpacity={0.05} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#DFD5C4" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2EAE0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#597057', fontWeight: 600 }} />
                     <YAxis tick={{ fontSize: 11, fill: '#597057', fontWeight: 600 }} />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#FAF8F5',
-                        borderColor: '#DFD5C4',
+                        backgroundColor: '#FFFFFF',
+                        borderColor: 'rgba(27, 67, 50, 0.15)',
                         borderRadius: '0.75rem',
                         fontSize: '12px',
                         boxShadow: '0 10px 25px -5px rgba(9,36,33,0.1)',
@@ -244,7 +244,7 @@ export function AdminDashboard() {
                 </ResponsiveContainer>
               </div>
 
-              <div className="flex items-center justify-center gap-6 mt-4 pt-3 border-t border-beige-200 text-xs font-bold text-darkgreen-950">
+              <div className="flex items-center justify-center gap-6 mt-4 pt-3 border-t border-[#1B4332]/10 text-xs font-bold text-darkgreen-950">
                 <div className="flex items-center gap-2">
                   <span className="w-3.5 h-3.5 rounded bg-[#092421] shadow-xs" />
                   <span>Public Litter Reports Logged</span>
@@ -317,16 +317,16 @@ export function AdminDashboard() {
         {/* Left: Reports Action Table */}
         <div className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-charcoal-900">Incoming Submissions (Action Queue)</h2>
+            <h2 className="text-lg font-bold text-charcoal-900">Incident Action Queue</h2>
             <Link to="/map" className="text-xs text-forest-800 hover:text-forest-950 font-bold flex items-center gap-1">
               Inspect on GIS map <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <Card className="border-beige-300/90 shadow-soft overflow-hidden">
+          <Card className="border-[#1B4332]/10 shadow-soft overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-beige-200/80 text-darkgreen-950 font-bold border-b border-beige-300">
+                <thead className="bg-[#F4F7F2] text-[#10241B] font-bold border-b border-[#1B4332]/10">
                   <tr>
                     <th className="py-3.5 px-4">Incident</th>
                     <th className="py-3.5 px-4">Severity</th>
@@ -335,13 +335,13 @@ export function AdminDashboard() {
                     <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-beige-200/80">
+                <tbody className="divide-y divide-[#1B4332]/10">
                   {recentReports.slice(0, 5).map((r) => {
                     const sevProps = getSeverityBadgeProps(r.severity);
                     const statProps = getStatusBadgeProps(r.status);
 
                     return (
-                      <tr key={r.id} className="hover:bg-beige-100/60 transition-colors">
+                      <tr key={r.id} className="hover:bg-[#F4F7F2] transition-colors">
                         <td className="py-3.5 px-4">
                           <div className="font-extrabold text-charcoal-900">{r.title}</div>
                           <div className="text-[11px] text-charcoal-500 truncate max-w-xs">{r.address}</div>

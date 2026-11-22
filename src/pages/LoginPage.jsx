@@ -185,13 +185,11 @@ export function LoginPage() {
         {/* Brand header */}
         <div className="text-center space-y-2">
           <Link to="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-12 h-12 rounded-2xl bg-[#092421] p-1 border border-[#27403C] shadow-soft flex items-center justify-center transition-transform group-hover:scale-105">
-              <img
-                src="/images/vasundhara-ai-logo.png"
-                alt="Vasundhara AI"
-                className="w-full h-full object-contain"
-              />
-            </div>
+            <img
+              src="/images/vasundhara-ai-logo.webp"
+              alt="Vasundhara AI – Environmental Intelligence"
+              className="h-12 w-auto object-contain shrink-0 transition-transform duration-300 group-hover:scale-105"
+            />
             <div className="text-left">
               <div className="flex items-center gap-1.5">
                 <span className="font-serif font-bold text-2xl text-[#10241B]">Vasundhara</span>
@@ -206,12 +204,12 @@ export function LoginPage() {
           </Link>
 
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#10241B] tracking-tight">
-            {mode === 'login' ? 'Welcome Back, Steward' : 'Join the Civic Stewardship Network'}
+            {mode === 'login' ? 'Sign In' : 'Create Account'}
           </h1>
           <p className="text-xs sm:text-sm text-[#556E55] max-w-md mx-auto">
             {mode === 'login'
-              ? 'Access real-time GIS pollution intelligence, municipal dispatches, and your environmental impact portfolio.'
-              : 'Empower your neighborhood with AI-verified litter mapping and municipal cleanup tracking.'}
+              ? 'Access your dashboard, reports, and cleanup status.'
+              : 'Register to submit pollution reports and track local cleanups.'}
           </p>
         </div>
 
@@ -220,10 +218,10 @@ export function LoginPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#74D7CB]">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Instant Reviewer / Evaluator Logins:</span>
+              <span>Demo Accounts:</span>
             </div>
             <span className="text-[10px] text-[#A3D9CE] font-mono bg-[#1B4A45] px-2 py-0.5 rounded-full">
-              1-Click Autofill
+              1-Click Fill
             </span>
           </div>
 
@@ -273,7 +271,7 @@ export function LoginPage() {
         <Card className="border-[#1B4332]/15 shadow-soft-md bg-white">
           <CardBody className="p-6 sm:p-8 space-y-6">
             {/* Segmented Switcher (Sign In / Register) */}
-            <div className="bg-[#FAF8F3] p-1 rounded-2xl border border-[#1B4332]/15 flex items-center shadow-inner">
+            <div className="bg-[#F4F7F2] p-1 rounded-2xl border border-[#1B4332]/15 flex items-center shadow-inner">
               <button
                 type="button"
                 onClick={() => {
@@ -282,8 +280,8 @@ export function LoginPage() {
                 }}
                 className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
                   mode === 'login'
-                    ? 'bg-[#092421] text-[#74D7CB] shadow-sm font-black border border-[#27403C]'
-                    : 'text-[#242D2B] hover:text-[#092421]'
+                    ? 'bg-[#1B4332] text-[#74D7CB] shadow-sm font-black border border-[#2D6A4F]/60'
+                    : 'text-[#242D2B] hover:text-[#1B4332]'
                 }`}
               >
                 <KeyRound className="w-3.5 h-3.5" />
@@ -297,8 +295,8 @@ export function LoginPage() {
                 }}
                 className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
                   mode === 'register'
-                    ? 'bg-[#092421] text-[#74D7CB] shadow-sm font-black border border-[#27403C]'
-                    : 'text-[#242D2B] hover:text-[#092421]'
+                    ? 'bg-[#1B4332] text-[#74D7CB] shadow-sm font-black border border-[#2D6A4F]/60'
+                    : 'text-[#242D2B] hover:text-[#1B4332]'
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
@@ -331,7 +329,7 @@ export function LoginPage() {
                         value={formData.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
                         placeholder="e.g. Priya Deshmukh"
-                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#10241B] bg-[#FAF8F3] text-charcoal-900 font-medium"
+                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-medium"
                       />
                     </div>
                   </div>
@@ -348,7 +346,7 @@ export function LoginPage() {
                         className={`p-2.5 rounded-xl border text-left flex items-start gap-2 transition-all ${
                           formData.role === 'citizen'
                             ? 'bg-[#DEF5F1] border-[#74D7CB] text-[#092421] font-bold shadow-xs ring-1 ring-[#74D7CB]'
-                            : 'bg-[#FAF8F3] border-sage-200 text-charcoal-700 hover:bg-white'
+                            : 'bg-white border-sage-200 text-charcoal-700 hover:bg-[#F4F7F2]'
                         }`}
                       >
                         <Leaf className="w-4 h-4 text-[#1B4A45] shrink-0 mt-0.5" />
@@ -366,7 +364,7 @@ export function LoginPage() {
                         className={`p-2.5 rounded-xl border text-left flex items-start gap-2 transition-all ${
                           formData.role === 'municipal_admin'
                             ? 'bg-[#DEF5F1] border-[#74D7CB] text-[#092421] font-bold shadow-xs ring-1 ring-[#74D7CB]'
-                            : 'bg-[#FAF8F3] border-sage-200 text-charcoal-700 hover:bg-white'
+                            : 'bg-white border-sage-200 text-charcoal-700 hover:bg-[#F4F7F2]'
                         }`}
                       >
                         <Building2 className="w-4 h-4 text-[#1B4A45] shrink-0 mt-0.5" />
@@ -390,7 +388,7 @@ export function LoginPage() {
                       <select
                         value={formData.municipalityName}
                         onChange={(e) => handleInputChange('municipalityName', e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#10241B] bg-[#FAF8F3] text-charcoal-900 font-semibold"
+                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-semibold"
                       >
                         <option value="Pune Municipal Corporation">Pune Municipal Corporation (PMC)</option>
                         <option value="Brihanmumbai Municipal Corporation">Brihanmumbai Municipal Corporation (BMC)</option>
@@ -412,7 +410,7 @@ export function LoginPage() {
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         placeholder="+91 98765 43210"
-                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#10241B] bg-[#FAF8F3] text-charcoal-900 font-medium"
+                        className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-medium"
                       />
                     </div>
                   </div>
@@ -432,7 +430,7 @@ export function LoginPage() {
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     placeholder="steward@domain.eco"
-                    className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#10241B] bg-[#FAF8F3] text-charcoal-900 font-medium"
+                    className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-medium"
                   />
                 </div>
               </div>
@@ -464,7 +462,7 @@ export function LoginPage() {
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     placeholder={mode === 'login' ? '••••••••••••' : 'At least 8 characters'}
-                    className="w-full pl-10 pr-10 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#10241B] bg-[#FAF8F3] text-charcoal-900 font-medium"
+                    className="w-full pl-10 pr-10 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-medium"
                   />
                   <button
                     type="button"
@@ -483,7 +481,7 @@ export function LoginPage() {
                       <span className="text-charcoal-500">Security Strength:</span>
                       <span className={strength.text}>{strength.label}</span>
                     </div>
-                    <div className="w-full h-1.5 bg-beige-200 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-[#E5EDE5] rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-300 ${strength.color}`}
                         style={{ width: `${strength.score}%` }}
@@ -507,7 +505,7 @@ export function LoginPage() {
                       value={formData.confirmPassword}
                       onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                       placeholder="Repeat your password"
-                      className="w-full pl-10 pr-10 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#10241B] bg-[#FAF8F3] text-charcoal-900 font-medium"
+                      className="w-full pl-10 pr-10 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-medium"
                     />
                     <button
                       type="button"
@@ -564,7 +562,7 @@ export function LoginPage() {
             </form>
 
             {/* Bottom Switch Link */}
-            <div className="pt-2 border-t border-beige-200 text-center text-xs text-[#556E55]">
+            <div className="pt-2 border-t border-[#1B4332]/10 text-center text-xs text-[#556E55]">
               {mode === 'login' ? (
                 <span>
                   New to Vasundhara AI?{' '}
@@ -656,7 +654,7 @@ export function LoginPage() {
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     placeholder="steward@domain.eco"
-                    className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#10241B] bg-[#FAF8F3] text-charcoal-900 font-medium"
+                    className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-medium"
                   />
                 </div>
               </div>

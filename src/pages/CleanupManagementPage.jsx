@@ -99,13 +99,13 @@ export function CleanupManagementPage() {
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-[#DEF5F1] text-[#092421] mb-2 border border-[#98E0D5] shadow-xs">
             <Truck className="w-3.5 h-3.5 text-[#1B4A45]" />
-            <span>Municipal Dispatch Command</span>
+            <span>Cleanup Operations</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#10241B] tracking-tight">
-            Cleanup Operations & Verification
+            Cleanup Management
           </h1>
           <p className="text-xs sm:text-sm text-[#556E55] mt-1 max-w-2xl leading-relaxed font-medium">
-            Coordinate municipal contractor squads, inspect work orders, and certify public space clearance using interactive before-and-after audit comparisons.
+            Coordinate contractor squads, track work orders, and certify clearance with before/after photos.
           </p>
         </div>
 
@@ -116,7 +116,7 @@ export function CleanupManagementPage() {
             onClick={loadCleanups}
             className="shadow-xs rounded-full px-4 py-2 font-bold"
           >
-            Refresh Queue
+            Refresh
           </Button>
         </div>
       </div>
@@ -164,11 +164,10 @@ export function CleanupManagementPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${
-                activeTab === tab.id
+              className={`py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === tab.id
                   ? 'border-[#74D7CB] text-[#092421] font-black'
                   : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -211,19 +210,18 @@ export function CleanupManagementPage() {
                       </span>
                       <span className="text-xs text-charcoal-300">•</span>
                       <span
-                        className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-                          isCompleted
+                        className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${isCompleted
                             ? 'bg-forest-50 text-forest-800 border-forest-200 shadow-xs'
                             : isInProgress
-                            ? 'bg-blue-50 text-blue-800 border-blue-200 shadow-xs'
-                            : 'bg-amber-50 text-amber-800 border-amber-200 shadow-xs'
-                        }`}
+                              ? 'bg-blue-50 text-blue-800 border-blue-200 shadow-xs'
+                              : 'bg-amber-50 text-amber-800 border-amber-200 shadow-xs'
+                          }`}
                       >
                         {isCompleted
                           ? 'Certified Cleaned'
                           : isInProgress
-                          ? 'Squad Dispatched'
-                          : 'Awaiting Crew'}
+                            ? 'Squad Dispatched'
+                            : 'Awaiting Crew'}
                       </span>
                     </div>
 
@@ -278,7 +276,7 @@ export function CleanupManagementPage() {
                 </div>
 
                 {/* Details Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-beige-100/80 border border-beige-300/80 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-[#F4F7F2] border border-[#1B4332]/10 text-xs">
                   <div>
                     <span className="text-[10px] text-charcoal-400 font-bold uppercase tracking-wider block">Assigned Crew</span>
                     <span className="font-bold text-charcoal-900 truncate block mt-0.5">

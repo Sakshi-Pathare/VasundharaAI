@@ -27,3 +27,14 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Python backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+.venv/
+backend/.venv/
+.pytest_cache/
+backend/uploads/*
+!backend/uploads/.gitkeep

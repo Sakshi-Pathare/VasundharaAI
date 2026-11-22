@@ -170,13 +170,13 @@ export function ReportLitterPage() {
       {/* Header */}
       <div className="text-center sm:text-left space-y-2 pb-6 border-b border-[#1B4332]/10">
         <Badge variant="pista" dot pulse dotColor="bg-[#092421]">
-          Civic Sanitation Pipeline
+          Incident Reporting
         </Badge>
         <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#10241B] tracking-tight">
-          Report Public Litter Incident
+          Report Pollution
         </h1>
         <p className="text-xs sm:text-sm text-[#556E55] max-w-2xl leading-relaxed font-medium">
-          Submit photographic evidence and geocoded coordinates to alert municipal sanitation squads and feed the algorithmic hotspot recurrence engine.
+          Upload photos and coordinates for municipal review and cleanup dispatch.
         </p>
       </div>
 
@@ -186,11 +186,11 @@ export function ReportLitterPage() {
           imagePreview ? 'bg-[#74D7CB] text-[#092421] shadow-xs font-black' : 'bg-white/10 text-white font-bold'
         }`}>
           <Camera className="w-4 h-4 shrink-0" />
-          <span className="truncate">1. Photo Evidence</span>
+          <span className="truncate">1. Photo</span>
         </div>
         <div className="p-2.5 rounded-full flex items-center justify-center gap-2 bg-white/10 text-white font-bold shadow-xs">
           <MapPin className="w-4 h-4 shrink-0 text-[#74D7CB]" />
-          <span className="truncate">2. Location Pin</span>
+          <span className="truncate">2. Location</span>
         </div>
         <div className="p-2.5 rounded-full flex items-center justify-center gap-2 bg-white/10 text-white font-bold shadow-xs">
           <Layers className="w-4 h-4 shrink-0 text-[#74D7CB]" />
@@ -204,9 +204,9 @@ export function ReportLitterPage() {
             <CheckCircle className="w-6 h-6 text-limeaccent-300" />
           </div>
           <div>
-            <h4 className="font-extrabold text-base">Report Submitted & Verified!</h4>
+            <h4 className="font-extrabold text-base">Report Submitted</h4>
             <p className="text-xs text-forest-800 mt-0.5">
-              Your submission has been queued for municipal crew assignment. Redirecting to your personal reports ledger...
+              Queued for municipal review and crew assignment. Redirecting...
             </p>
           </div>
         </div>
@@ -223,8 +223,8 @@ export function ReportLitterPage() {
         {/* Step 1: Photographic Evidence with AI Vision preview */}
         <Card className="border-sage-300/90 shadow-soft">
           <CardHeader
-            title="1. Photographic Evidence"
-            subtitle="Clear photographs enable accurate waste material detection and volume estimation."
+            title="1. Photo Evidence"
+            subtitle="Clear photos enable accurate waste detection and volume estimation."
             icon={Camera}
           />
           <CardBody className="space-y-4">
@@ -235,7 +235,7 @@ export function ReportLitterPage() {
             />
 
             {/* AI Staging Notice Card */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-beige-100 via-pista-50/70 to-beige-100 border border-pista-300 flex items-start gap-3.5 shadow-xs">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#F4F7F2] via-[#E8F4EC] to-[#F4F7F2] border border-[#74D7CB]/40 flex items-start gap-3.5 shadow-xs">
               <div className="w-8 h-8 rounded-xl bg-[#092421] text-[#74D7CB] flex items-center justify-center shrink-0 mt-0.5 shadow-xs border border-[#27403C]">
                 <Sparkles className="w-4 h-4 text-[#74D7CB]" />
               </div>
@@ -259,8 +259,8 @@ export function ReportLitterPage() {
         {/* Step 2: Location Selection */}
         <Card className="border-sage-300/90 shadow-soft">
           <CardHeader
-            title="2. Geospatial Pin & Address"
-            subtitle="Click or drag pin to the exact litter location. Browser GPS can locate you automatically."
+            title="2. Incident Location"
+            subtitle="Click or drag pin to the exact location. Browser GPS can locate you automatically."
             icon={MapPin}
           />
           <CardBody className="space-y-4">
@@ -273,7 +273,7 @@ export function ReportLitterPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div>
                 <label className="block text-xs font-bold text-charcoal-800 mb-1">
-                  Location / Landmark Name
+                  Location / Landmark
                 </label>
                 <div className="relative">
                   <MapPin className="w-4 h-4 text-forest-700 absolute left-3.5 top-3" />
@@ -282,7 +282,7 @@ export function ReportLitterPage() {
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     className="w-full pl-10 pr-3.5 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-forest-500 bg-white font-medium"
-                    placeholder="e.g. Near Deccan Gymkhana bus stop or FC Road fountain"
+                    placeholder="e.g. Near Deccan Gymkhana bus stop"
                   />
                 </div>
               </div>
@@ -316,8 +316,8 @@ export function ReportLitterPage() {
         {/* Step 3: Incident Classification & Ecological Impact */}
         <Card className="border-sage-300/90 shadow-soft">
           <CardHeader
-            title="3. Material Classification & Urgency"
-            subtitle="Categorize the dominant waste type to compute priority scores and crew equipment."
+            title="3. Waste Classification"
+            subtitle="Specify waste category and estimated volume for cleanup crew priority."
             icon={Layers}
           />
           <CardBody className="space-y-5">
@@ -330,7 +330,7 @@ export function ReportLitterPage() {
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-forest-500 bg-white font-semibold"
-                placeholder="e.g. Broken glass and plastic beverage bottles strewn on public lawn"
+                placeholder="e.g. Plastic bottles on riverside footpath"
                 required
               />
             </div>
@@ -338,7 +338,7 @@ export function ReportLitterPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-charcoal-800 mb-1">
-                  Dominant Waste Category
+                  Waste Category
                 </label>
                 <select
                   value={formData.category}
@@ -386,7 +386,7 @@ export function ReportLitterPage() {
             </div>
 
             {/* Material Environmental Impact Capsule */}
-            <div className="p-4 rounded-2xl bg-beige-100/90 border border-beige-300/80 space-y-2 text-xs">
+            <div className="p-4 rounded-2xl bg-[#F4F7F2] border border-[#1B4332]/10 space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-darkgreen-950 flex items-center gap-1.5">
                   <ShieldAlert className="w-4 h-4 text-botanical-700" />

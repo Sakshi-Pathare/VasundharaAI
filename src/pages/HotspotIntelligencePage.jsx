@@ -192,14 +192,14 @@ export function HotspotIntelligencePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#1B4332]/10">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-rose-100 text-rose-900 mb-2 border border-rose-200 shadow-xs">
-            <Flame className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-            <span>Algorithmic Hotspot Clustering Engine</span>
+            <Flame className="w-3.5 h-3.5 text-rose-600" />
+            <span>Hotspot Analytics</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#10241B] tracking-tight">
-            Hotspot Intelligence & Priority Ranking
+            Hotspot Intelligence
           </h1>
           <p className="text-xs sm:text-sm text-[#556E55] mt-1 max-w-2xl leading-relaxed font-medium">
-            Automated geospatial recurrence clustering. High-frequency dumping corridors ranked by dynamic multi-parameter Cleanup Priority Score.
+            Algorithmic recurrence clustering and priority ranking for high-frequency dump corridors.
           </p>
         </div>
 
@@ -212,7 +212,7 @@ export function HotspotIntelligencePage() {
             onClick={() => setIsAddModalOpen(true)}
             className="rounded-full px-4 py-2 font-black shadow-md"
           >
-            Add Real Hotspot
+            Add Hotspot
           </Button>
 
           <button
@@ -220,21 +220,21 @@ export function HotspotIntelligencePage() {
             className={`px-4 py-2 rounded-full text-xs font-bold transition-all inline-flex items-center gap-2 border shadow-xs ${
               simulationActive
                 ? 'bg-[#DEF5F1] text-[#092421] border-[#74D7CB] ring-2 ring-[#74D7CB]/40'
-                : 'bg-white text-[#242D2B] border-[#1B4332]/15 hover:bg-[#FAF8F3]'
+                : 'bg-white text-[#242D2B] border-[#1B4332]/15 hover:bg-[#F4F7F2]'
             }`}
           >
             <Zap className={`w-3.5 h-3.5 ${simulationActive ? 'text-[#10241B]' : 'text-amber-500'}`} />
-            <span>Remediation Simulator {simulationActive ? 'ACTIVE' : 'OFF'}</span>
+            <span>Simulator: {simulationActive ? 'ACTIVE' : 'OFF'}</span>
           </button>
 
           <Link to="/map">
             <Button variant="outline" size="sm" icon={Compass} className="rounded-full px-4 py-2 font-bold">
-              View on GIS Map
+              Map View
             </Button>
           </Link>
           <Link to="/cleanups">
             <Button variant="primary" size="sm" icon={ShieldAlert} className="rounded-full px-4 py-2 font-bold">
-              Dispatch Squads
+              Dispatch
             </Button>
           </Link>
         </div>
@@ -346,7 +346,7 @@ export function HotspotIntelligencePage() {
         <div className="flex items-center gap-2 text-xs font-semibold text-charcoal-700 shrink-0">
           <ArrowUpDown className="w-3.5 h-3.5 text-forest-700" />
           <span className="text-[11px] text-charcoal-400">Sort:</span>
-          <div className="inline-flex rounded-xl border border-sage-300 bg-beige-50 p-0.5 shadow-xs">
+          <div className="inline-flex rounded-xl border border-[#1B4332]/15 bg-[#F4F7F2] p-0.5 shadow-xs">
             <button
               onClick={() => setSortBy('priority')}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -426,7 +426,7 @@ export function HotspotIntelligencePage() {
                   </div>
 
                   {/* Priority Gauge Badge */}
-                  <div className="text-center p-3 rounded-2xl bg-beige-100/90 border border-beige-300 shrink-0 min-w-[76px] shadow-xs">
+                  <div className="text-center p-3 rounded-2xl bg-[#F4F7F2] border border-[#1B4332]/10 shrink-0 min-w-[76px] shadow-xs">
                     <span className="text-[9px] uppercase font-bold text-charcoal-400 block tracking-wider">Priority</span>
                     <span
                       className={`text-2xl font-black font-mono transition-all duration-500 ${
@@ -446,7 +446,7 @@ export function HotspotIntelligencePage() {
                 </div>
 
                 {/* Key Metrics Breakdown */}
-                <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-beige-100/70 border border-beige-200/90 text-xs">
+                <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-[#F4F7F2] border border-[#1B4332]/10 text-xs">
                   <div>
                     <span className="text-[10px] text-charcoal-400 font-bold uppercase tracking-wider block">Recurrence</span>
                     <span className="font-extrabold text-charcoal-900 font-mono text-xs">{hotspot.recurrenceCount} Reports</span>
@@ -543,7 +543,7 @@ export function HotspotIntelligencePage() {
                 placeholder="e.g. Mithi River Drainage Basin"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-medium focus:ring-2 focus:ring-[#74D7CB] outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-medium focus:ring-2 focus:ring-[#74D7CB] outline-none"
               />
             </div>
             <div>
@@ -553,7 +553,7 @@ export function HotspotIntelligencePage() {
                 placeholder="e.g. Shivajinagar Ward 4"
                 value={formData.district}
                 onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-medium focus:ring-2 focus:ring-[#74D7CB] outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-medium focus:ring-2 focus:ring-[#74D7CB] outline-none"
               />
             </div>
           </div>
@@ -567,7 +567,7 @@ export function HotspotIntelligencePage() {
                 required
                 value={formData.latitude}
                 onChange={(e) => setFormData({ ...formData, latitude: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-mono font-bold focus:ring-2 focus:ring-[#74D7CB] outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-mono font-bold focus:ring-2 focus:ring-[#74D7CB] outline-none"
               />
             </div>
             <div>
@@ -578,7 +578,7 @@ export function HotspotIntelligencePage() {
                 required
                 value={formData.longitude}
                 onChange={(e) => setFormData({ ...formData, longitude: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-mono font-bold focus:ring-2 focus:ring-[#74D7CB] outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-mono font-bold focus:ring-2 focus:ring-[#74D7CB] outline-none"
               />
             </div>
             <div>
@@ -589,7 +589,7 @@ export function HotspotIntelligencePage() {
                 max="2000"
                 value={formData.radiusMeters}
                 onChange={(e) => setFormData({ ...formData, radiusMeters: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-mono focus:ring-2 focus:ring-[#74D7CB] outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-mono focus:ring-2 focus:ring-[#74D7CB] outline-none"
               />
             </div>
           </div>
@@ -600,7 +600,7 @@ export function HotspotIntelligencePage() {
               <select
                 value={formData.dominantCategory}
                 onChange={(e) => setFormData({ ...formData, dominantCategory: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-medium outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-medium outline-none"
               >
                 <option value="plastic">Plastics & Packaging</option>
                 <option value="glass">Glass & Bottles</option>
@@ -615,7 +615,7 @@ export function HotspotIntelligencePage() {
               <select
                 value={formData.severity}
                 onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-medium outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-medium outline-none"
               >
                 <option value="high">Critical (Tier 1)</option>
                 <option value="medium">Moderate (Tier 2)</option>
@@ -630,7 +630,7 @@ export function HotspotIntelligencePage() {
                 max="100"
                 value={formData.priorityScore}
                 onChange={(e) => setFormData({ ...formData, priorityScore: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-mono font-bold outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-mono font-bold outline-none"
               />
             </div>
           </div>
@@ -641,7 +641,7 @@ export function HotspotIntelligencePage() {
               rows="2"
               value={formData.environmentalRisk}
               onChange={(e) => setFormData({ ...formData, environmentalRisk: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-medium outline-none resize-none"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-medium outline-none resize-none"
             />
           </div>
 
@@ -651,7 +651,7 @@ export function HotspotIntelligencePage() {
               rows="2"
               value={formData.suggestedAction}
               onChange={(e) => setFormData({ ...formData, suggestedAction: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-[#FAF8F3] text-[#12181A] font-medium outline-none resize-none"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-[#1B4332]/20 bg-white text-[#12181A] font-medium outline-none resize-none"
             />
           </div>
 

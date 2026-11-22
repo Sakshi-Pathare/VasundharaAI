@@ -79,19 +79,19 @@ export function MyReportsPage() {
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-[#DEF5F1] text-[#092421] mb-2 border border-[#98E0D5] shadow-xs">
             <Layers className="w-3.5 h-3.5 text-[#1B4A45]" />
-            <span>Civic Incident Ledger</span>
+            <span>Incident Ledger</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#10241B] tracking-tight">
-            My Submissions & History
+            My Reports
           </h1>
           <p className="text-xs sm:text-sm text-[#556E55] mt-1 max-w-xl font-medium">
-            Review your uploaded pollution reports, municipal inspection notes, and verified cleanup resolution timelines.
+            Track your submitted pollution reports, municipal reviews, and cleanup status.
           </p>
         </div>
 
         <Link to="/report">
           <Button variant="pista" size="md" icon={Camera} glow className="shadow-lg rounded-full px-5 py-2.5 font-black hover:scale-105 active:scale-95 transition-all">
-            Submit New Report
+            Report Pollution
           </Button>
         </Link>
       </div>
@@ -104,7 +104,7 @@ export function MyReportsPage() {
       )}
 
       {/* Filter / Search Bar with Status Tabs */}
-      <div className="glass-panel p-4 rounded-2xl border border-beige-300/90 shadow-soft flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="glass-panel p-4 rounded-2xl border border-[#1B4332]/10 shadow-soft flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         {/* Status filter tabs */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
           {[
@@ -120,7 +120,7 @@ export function MyReportsPage() {
               className={`px-3 py-1.5 rounded-xl transition-all ${
                 statusFilter === tab.id
                   ? 'bg-[#092421] text-[#74D7CB] font-bold shadow-xs border border-[#27403C]'
-                  : 'text-charcoal-700 hover:text-darkgreen-950 hover:bg-beige-200/70'
+                  : 'text-charcoal-700 hover:text-darkgreen-950 hover:bg-[#F4F7F2]'
               }`}
             >
               {tab.label}
@@ -136,7 +136,7 @@ export function MyReportsPage() {
             placeholder="Search by title, report ID or street address..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-darkgreen-700 bg-beige-50/90 text-charcoal-900 font-medium"
+            className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-[#1B4332]/20 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-medium"
           />
         </div>
       </div>

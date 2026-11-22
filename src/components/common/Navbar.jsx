@@ -99,13 +99,11 @@ export function Navbar() {
             {/* Brand Logo & Return to Public Site Pill */}
             <div className="flex items-center gap-3">
               <Link to="/app" className="flex items-center gap-3 group">
-                <div className="relative w-10 h-10 rounded-2xl bg-[#123632] flex items-center justify-center p-0.5 text-white shadow-soft transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_15px_rgba(116,215,203,0.4)] border border-[#27403C] overflow-hidden">
-                  <img
-                    src="/images/vasundhara-ai-logo.png"
-                    alt="Vasundhara AI environmental sustainability logo"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
+                <img
+                  src="/images/vasundhara-ai-logo.webp"
+                  alt="Vasundhara AI – Environmental Intelligence"
+                  className="h-10 sm:h-11 w-auto object-contain shrink-0 transition-transform duration-300 group-hover:scale-105"
+                />
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-serif font-bold text-2xl tracking-normal text-white">

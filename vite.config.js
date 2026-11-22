@@ -8,6 +8,10 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     open: false,
+    proxy: {
+      '/api': 'http://localhost:8001',
+      '/static': 'http://localhost:8001',
+    },
   },
   build: {
     rollupOptions: {

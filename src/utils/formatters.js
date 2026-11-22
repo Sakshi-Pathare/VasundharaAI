@@ -59,8 +59,8 @@ export function getStatusBadgeProps(status) {
     default:
       return {
         label: 'Under Review',
-        bg: 'bg-beige-200 text-[#092421] border-beige-300 font-bold',
-        dot: 'bg-[#27403C]',
+        bg: 'bg-[#F0F5EE] text-[#1B4332] border-[#A3B18A]/40 font-bold',
+        dot: 'bg-[#2D6A4F]',
       };
   }
 }

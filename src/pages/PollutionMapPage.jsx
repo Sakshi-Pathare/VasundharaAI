@@ -109,14 +109,14 @@ export function PollutionMapPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[#1B4332]/10">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-[#DEF5F1] text-[#092421] mb-2 border border-[#98E0D5] shadow-xs">
-            <Compass className="w-3.5 h-3.5 text-[#1B4A45] animate-spin-slow" />
-            <span>GIS Geospatial Cartography Engine</span>
+            <Compass className="w-3.5 h-3.5 text-[#1B4A45]" />
+            <span>GIS Map</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#10241B] tracking-tight">
-            Pollution & Hotspot GIS Map
+            Pollution Map
           </h1>
           <p className="text-xs sm:text-sm text-[#556E55] mt-1 max-w-xl leading-relaxed font-medium">
-            Real-time geospatial intelligence, recurrence buffer zones, and active municipal cleanup coordinates.
+            Real-time incident reports, recurrence zones, and cleanup locations.
           </p>
         </div>
 
@@ -127,12 +127,12 @@ export function PollutionMapPage() {
             className={`px-4 py-2 text-xs font-bold rounded-full border transition-all inline-flex items-center gap-2 shadow-xs ${
               showHotspotLayers
                 ? 'bg-rose-50 border-rose-300 text-rose-800 ring-2 ring-rose-400/20'
-                : 'bg-white border-[#1B4332]/15 text-[#242D2B] hover:bg-[#FAF8F3]'
+                : 'bg-white border-[#1B4332]/15 text-[#242D2B] hover:bg-[#F4F7F2]'
             }`}
             title="Toggle Hotspot Risk Zones"
           >
             <Flame className="w-3.5 h-3.5 text-rose-600" />
-            <span>Hotspots Overlay {showHotspotLayers ? 'ON' : 'OFF'}</span>
+            <span>Hotspots: {showHotspotLayers ? 'ON' : 'OFF'}</span>
           </button>
 
           <div className="bg-[#102D27] p-1 rounded-full flex items-center border border-[#23584E] shadow-inner">
@@ -144,7 +144,7 @@ export function PollutionMapPage() {
                   : 'text-white hover:text-[#74D7CB]'
               }`}
             >
-              <MapPin className="w-3.5 h-3.5" /> Map View
+              <MapPin className="w-3.5 h-3.5" /> Map
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -154,7 +154,7 @@ export function PollutionMapPage() {
                   : 'text-white hover:text-[#74D7CB]'
               }`}
             >
-              <List className="w-3.5 h-3.5" /> List View ({reports.length})
+              <List className="w-3.5 h-3.5" /> List ({reports.length})
             </button>
           </div>
         </div>
@@ -171,7 +171,7 @@ export function PollutionMapPage() {
               placeholder="Search by neighborhood, street, description or report ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-darkgreen-700 bg-beige-50/90 placeholder:text-charcoal-400 text-charcoal-900 font-medium"
+              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-[#1B4332]/20 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white placeholder:text-charcoal-400 text-charcoal-900 font-medium"
             />
           </div>
 
@@ -180,7 +180,7 @@ export function PollutionMapPage() {
             <select
               value={severityFilter}
               onChange={(e) => setSeverityFilter(e.target.value)}
-              className="text-xs py-2 px-3.5 rounded-xl border border-sage-300 bg-beige-50 text-charcoal-800 font-semibold focus:outline-none focus:ring-2 focus:ring-darkgreen-700 shadow-xs"
+              className="text-xs py-2 px-3.5 rounded-xl border border-[#1B4332]/20 bg-white text-charcoal-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B4332] shadow-xs"
             >
               <option value="all">All Severities</option>
               <option value="high">Critical Impact Only</option>
@@ -191,7 +191,7 @@ export function PollutionMapPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs py-2 px-3.5 rounded-xl border border-sage-300 bg-beige-50 text-charcoal-800 font-semibold focus:outline-none focus:ring-2 focus:ring-darkgreen-700 shadow-xs"
+              className="text-xs py-2 px-3.5 rounded-xl border border-[#1B4332]/20 bg-white text-charcoal-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B4332] shadow-xs"
             >
               <option value="all">All Statuses</option>
               <option value="pending">Under Review</option>
@@ -203,7 +203,7 @@ export function PollutionMapPage() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="text-xs py-2 px-3.5 rounded-xl border border-sage-300 bg-beige-50 text-charcoal-800 font-semibold focus:outline-none focus:ring-2 focus:ring-darkgreen-700 shadow-xs"
+              className="text-xs py-2 px-3.5 rounded-xl border border-[#1B4332]/20 bg-white text-charcoal-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B4332] shadow-xs"
             >
               <option value="all">All Material Types</option>
               <option value="plastic">Plastics & Packaging</option>
@@ -231,12 +231,12 @@ export function PollutionMapPage() {
         </div>
 
         {/* Quick Filter Presets Chips */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-beige-300/80 text-xs">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#1B4332]/10 text-xs">
           <span className="text-[11px] font-bold text-sage-600 uppercase tracking-wider">Quick Presets:</span>
           <button
             onClick={() => { setSeverityFilter('high'); }}
             className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
-              severityFilter === 'high' ? 'bg-rose-600 text-white shadow-xs' : 'bg-beige-50 text-rose-800 border border-rose-200 hover:bg-rose-50'
+              severityFilter === 'high' ? 'bg-rose-600 text-white shadow-xs' : 'bg-white text-rose-800 border border-rose-200 hover:bg-rose-50'
             }`}
           >
             🔥 High Priority Dumps ({highSeverityCount})
@@ -244,7 +244,7 @@ export function PollutionMapPage() {
           <button
             onClick={() => { setStatusFilter('cleaned'); }}
             className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
-              statusFilter === 'cleaned' ? 'bg-[#092421] text-[#74D7CB] shadow-xs' : 'bg-beige-50 text-darkgreen-800 border border-sage-300 hover:bg-pista-100'
+              statusFilter === 'cleaned' ? 'bg-[#092421] text-[#74D7CB] shadow-xs' : 'bg-white text-darkgreen-800 border border-sage-300 hover:bg-[#DEF5F1]'
             }`}
           >
             ✓ Certified Restored ({reports.filter(r => r.status === 'cleaned').length})
@@ -252,7 +252,7 @@ export function PollutionMapPage() {
           <button
             onClick={() => { setCategoryFilter('plastic'); }}
             className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
-              categoryFilter === 'plastic' ? 'bg-[#092421] text-[#74D7CB] shadow-xs' : 'bg-beige-50 text-charcoal-700 border border-beige-300 hover:bg-beige-100'
+              categoryFilter === 'plastic' ? 'bg-[#092421] text-[#74D7CB] shadow-xs' : 'bg-white text-charcoal-700 border border-[#1B4332]/15 hover:bg-[#F4F7F2]'
             }`}
           >
             Plastics Only
@@ -283,7 +283,7 @@ export function PollutionMapPage() {
                   className={`px-3 py-1 rounded-full text-xs transition-all ${
                     activeCity === city.id
                       ? 'bg-[#102D27] text-[#74D7CB] font-bold shadow-xs border border-[#74D7CB]/50'
-                      : 'bg-white text-[#242D2B] border border-[#1B4332]/15 hover:bg-[#FAF8F3]'
+                      : 'bg-white text-[#242D2B] border border-[#1B4332]/15 hover:bg-[#F4F7F2]'
                   }`}
                 >
                   {city.name}

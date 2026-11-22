@@ -13,13 +13,11 @@ export function Footer() {
           {/* Brand Info */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#123632] border border-[#27403C] p-1 flex items-center justify-center text-[#74D7CB] shadow-xs overflow-hidden shrink-0">
-                <img
-                  src="/images/vasundhara-ai-logo.png"
-                  alt="Vasundhara AI environmental sustainability logo"
-                  className="w-full h-full object-contain"
-                />
-              </div>
+              <img
+                src="/images/vasundhara-ai-logo.webp"
+                alt="Vasundhara AI – Environmental Intelligence"
+                className="h-10 w-auto object-contain shrink-0"
+              />
               <div className="flex items-center gap-2">
                 <span className="font-serif font-bold text-2xl text-white">Vasundhara</span>
                 <span className="text-[10px] font-mono font-black tracking-wider px-2 py-0.5 rounded-full bg-[#1B4A45] text-[#74D7CB] border border-[#74D7CB]/50 uppercase">
