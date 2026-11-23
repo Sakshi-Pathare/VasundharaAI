@@ -1,24 +1,36 @@
-import os
 from pathlib import Path
-
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from dotenv import load_dotenv
+from .config import BACKEND_DIR, logger, settings
 
-
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-load_dotenv(BACKEND_DIR / ".env")
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"sqlite:///{(BACKEND_DIR / 'ecowatch.db').as_posix()}",
-)
+DATABASE_URL = settings.database_url
 
 engine_options = {"pool_pre_ping": True}
-if DATABASE_URL.startswith("sqlite"):
-    engine_options["connect_args"] = {"check_same_thread": False}
+if settings.is_sqlite:
+    engine_options["connect_args"] = {
+        "check_same_thread": False,
+        "timeout": 30,
+    }
+else:
+    # PostgreSQL / MySQL connection pool settings
+    engine_options["pool_size"] = 10
+    engine_options["max_overflow"] = 20
 
 engine = create_engine(DATABASE_URL, **engine_options)
+
+# Enable Write-Ahead Logging (WAL) and busy timeout on SQLite to prevent locking collisions
+if settings.is_sqlite:
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragmas(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+        finally:
+            cursor.close()
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 REPORT_COLUMNS = {
@@ -55,4 +67,5 @@ def migrate_existing_schema():
     with engine.begin() as connection:
         for column_name, definition in report_columns.items():
             if column_name not in columns:
+                logger.info(f"Adding missing column '{column_name}' to 'reports' table")
                 connection.execute(text(f"ALTER TABLE reports ADD COLUMN {column_name} {definition}"))

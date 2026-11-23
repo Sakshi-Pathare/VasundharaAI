@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from '../components/common/Navbar';
 import { Footer } from '../components/common/Footer';
+import { ApiConnectionNotice } from '../components/common/ApiConnectionNotice';
 
 /**
  * AppLayout — Stage 2: Functional Environmental Intelligence Application
@@ -35,8 +36,9 @@ export function AppLayout() {
         />
       </div>
 
-      {/* Navigation (Sticky above background) */}
+      {/* Navigation & Connection Health Alert */}
       <div className="relative z-20">
+        <ApiConnectionNotice />
         <Navbar />
       </div>
 

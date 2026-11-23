@@ -1,22 +1,33 @@
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from .api import UPLOAD_DIR, api
-from .database import Base, SessionLocal, engine, migrate_existing_schema
+from .config import logger, settings
+from .database import Base, SessionLocal, engine, get_db, migrate_existing_schema
 from .security import bootstrap_super_admin
+from .vision import detector_status
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    logger.info(f"Starting Vasundhara AI API [Environment: {settings.environment}]")
+    logger.info(f"Database dialect: {engine.dialect.name} | URL: {settings.database_url.split('@')[-1]}")
+    logger.info(f"Upload directory configured at: {UPLOAD_DIR}")
+    logger.info(f"CORS allowed origins: {settings.cors_origins}")
+
     Base.metadata.create_all(bind=engine)
     migrate_existing_schema()
     with SessionLocal() as db:
         bootstrap_super_admin(db)
     yield
+    logger.info("Shutting down Vasundhara AI API.")
 
 
 app = FastAPI(
@@ -26,27 +37,35 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-allowed_origins = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173",
-    ).split(",")
-    if origin.strip()
-]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.mount("/static/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "vasundhara-ai-api"}
+def health_check(db: Session = Depends(get_db)):
+    db_connected = False
+    try:
+        db.execute(select(1))
+        db_connected = True
+    except Exception as exc:
+        logger.error(f"Database health check failed: {exc}")
+
+    return {
+        "status": "ok" if db_connected else "degraded",
+        "service": "vasundhara-ai-api",
+        "version": "2.0.0",
+        "environment": settings.environment,
+        "database": "connected" if db_connected else "disconnected",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "detector": detector_status(),
+    }
 
 
 app.include_router(api)
