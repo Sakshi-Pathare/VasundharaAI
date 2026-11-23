@@ -32,11 +32,15 @@ export function SuperAdminPage() {
     setLoading(true);
     setError('');
     try {
-      const [registeredMunicipalities, unassignedReports, auditRows] = await Promise.all([
+      const [rawMunicipalities, rawReports, rawAudit] = await Promise.all([
         superAdminService.getMunicipalities(),
         superAdminService.getPendingReports(),
         superAdminService.getAuditLog(),
       ]);
+      const registeredMunicipalities = Array.isArray(rawMunicipalities) ? rawMunicipalities : [];
+      const unassignedReports = Array.isArray(rawReports) ? rawReports : [];
+      const auditRows = Array.isArray(rawAudit) ? rawAudit : [];
+
       setMunicipalities(registeredMunicipalities);
       setPendingReports(unassignedReports);
       setAudit(auditRows);
