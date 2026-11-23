@@ -1,6 +1,10 @@
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
+
 from sqlalchemy import create_engine, event, inspect, text
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.exc import DBAPIError, OperationalError
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import BACKEND_DIR, logger, settings
 
@@ -13,9 +17,10 @@ if settings.is_sqlite:
         "timeout": 30,
     }
 else:
-    # PostgreSQL / MySQL connection pool settings
+    # PostgreSQL production connection pool configuration
     engine_options["pool_size"] = 10
     engine_options["max_overflow"] = 20
+    engine_options["pool_recycle"] = 1800
 
 engine = create_engine(DATABASE_URL, **engine_options)
 
@@ -42,6 +47,8 @@ REPORT_COLUMNS = {
     "jurisdiction_assignment_date": "DATETIME",
     "citizen_user_id": "VARCHAR(32)",
     "internal_notes": "TEXT NOT NULL DEFAULT ''",
+    "is_archived": "BOOLEAN NOT NULL DEFAULT 0",
+    "archived_at": "DATETIME",
 }
 
 
@@ -49,21 +56,55 @@ class Base(DeclarativeBase):
     pass
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
+    """Dependency generator yielding an active database session."""
     db = SessionLocal()
     try:
         yield db
+    except (OperationalError, DBAPIError) as db_err:
+        logger.error(f"Database operational error encountered: {db_err}")
+        db.rollback()
+        raise
     finally:
         db.close()
 
 
+@contextmanager
+def transaction_scope(db: Session):
+    """Transactional context manager ensuring atomic commits and rollbacks."""
+    try:
+        yield db
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Transaction rolled back due to error: {exc}")
+        raise
+
+
+def check_database_health() -> tuple[bool, str]:
+    """Checks database connectivity with dialect reporting."""
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return True, engine.dialect.name
+    except Exception as exc:
+        logger.error(f"Database health check failed: {exc}")
+        return False, str(exc)
+
+
 def migrate_existing_schema():
+    """Lightweight runtime column synchronizer for backward compatibility."""
     if "reports" not in inspect(engine).get_table_names():
         return
     columns = {column["name"] for column in inspect(engine).get_columns("reports")}
     datetime_type = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"
+    boolean_type = "BOOLEAN DEFAULT FALSE" if engine.dialect.name == "postgresql" else "BOOLEAN NOT NULL DEFAULT 0"
+
     report_columns = dict(REPORT_COLUMNS)
     report_columns["jurisdiction_assignment_date"] = datetime_type
+    report_columns["archived_at"] = datetime_type
+    report_columns["is_archived"] = boolean_type
+
     with engine.begin() as connection:
         for column_name, definition in report_columns.items():
             if column_name not in columns:
