@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .api import UPLOAD_DIR, api
 from .config import logger, settings
 from .database import Base, SessionLocal, engine, get_db, migrate_existing_schema
-from .security import bootstrap_super_admin
+from .security import bootstrap_initial_data, bootstrap_super_admin
 from .vision import detector_status
 
 
@@ -25,7 +25,7 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     migrate_existing_schema()
     with SessionLocal() as db:
-        bootstrap_super_admin(db)
+        bootstrap_initial_data(db)
     yield
     logger.info("Shutting down Vasundhara AI API.")
 

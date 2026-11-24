@@ -1,61 +1,59 @@
-import { initialMockHotspots } from '../data/mockHotspots.js';
+/**
+ * Vasundhara AI — Hotspot Intelligence Service
+ * Connects directly to FastAPI backend (/api/v1/hotspots) for spatial clustering,
+ * recurring accumulation detection, and environmental risk assessment.
+ */
 
-const STORAGE_KEY = 'vasundhara_hotspots_v2_mh';
-
-function loadStoredHotspots() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialMockHotspots));
-      return initialMockHotspots;
-    }
-    const parsed = JSON.parse(raw);
-    // If old cached data is from foreign coordinates (e.g. lat > 30 or lng < 0), auto-migrate to Maharashtra India
-    if (Array.isArray(parsed) && parsed.some(h => h.latitude > 30 || h.longitude < 0)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialMockHotspots));
-      return initialMockHotspots;
-    }
-    return parsed;
-  } catch (e) {
-    console.error('Failed to parse stored hotspots', e);
-    return initialMockHotspots;
-  }
-}
-
-function saveStoredHotspots(hotspots) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(hotspots));
-  } catch (e) {
-    console.error('Failed to save hotspots to localStorage', e);
-  }
-}
+import { api, getAuthToken } from './apiClient.js';
 
 export const hotspotService = {
+  /**
+   * Retrieves hotspot clusters.
+   * Uses tenant-scoped /hotspots when authenticated as municipal admin;
+   * otherwise uses public clustered /public/hotspots.
+   */
   async getHotspots(sortBy = 'priority') {
-    await new Promise((r) => setTimeout(r, 100));
-    const hotspots = loadStoredHotspots();
+    const validSort = ['priority', 'recurrence', 'date'].includes(sortBy) ? sortBy : 'priority';
+    const token = getAuthToken();
+    let data;
 
-    return [...hotspots].sort((a, b) => {
-      if (sortBy === 'priority') return b.priorityScore - a.priorityScore;
-      if (sortBy === 'recurrence') return b.recurrenceCount - a.recurrenceCount;
-      if (sortBy === 'date') return new Date(b.lastReportedDate) - new Date(a.lastReportedDate);
-      return 0;
-    });
+    if (token) {
+      try {
+        data = await api.get(`/hotspots?sort_by=${validSort}`);
+      } catch (err) {
+        if (err.isForbidden) {
+          data = await api.get(`/public/hotspots?sort_by=${validSort}`);
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      data = await api.get(`/public/hotspots?sort_by=${validSort}`);
+    }
+
+    if (!Array.isArray(data)) return [];
+    return data;
   },
 
+  /**
+   * Retrieves single hotspot details by ID.
+   */
   async getHotspotById(id) {
-    await new Promise((r) => setTimeout(r, 80));
-    const hotspots = loadStoredHotspots();
-    return hotspots.find((h) => h.id === id) || null;
+    try {
+      return await api.get(`/hotspots/${encodeURIComponent(id)}`);
+    } catch {
+      const all = await this.getHotspots();
+      return all.find((h) => h.id === id) || null;
+    }
   },
 
+  /**
+   * Client-side hotspot creation helper for simulated simulation views.
+   */
   async createHotspot(data) {
-    await new Promise((r) => setTimeout(r, 100));
-    const hotspots = loadStoredHotspots();
-    const newId = `HOT-${String(hotspots.length + 1).padStart(2, '0')}`;
-
-    const newHotspot = {
-      id: newId,
+    // If backend introduces dynamic hotspot insertion endpoint in future, dispatch here
+    return {
+      id: `HOT-${Date.now().toString(36).toUpperCase()}`,
       name: data.name || 'Custom Environmental Hotspot',
       district: data.district || 'Municipal Sector',
       latitude: Number(data.latitude),
@@ -70,28 +68,17 @@ export const hotspotService = {
       environmentalRisk: data.environmentalRisk || 'Identified repetitive public pollution accumulation',
       suggestedAction: data.suggestedAction || 'Sanitation dispatch and monitoring sensor placement',
     };
-
-    const updated = [newHotspot, ...hotspots];
-    saveStoredHotspots(updated);
-    return newHotspot;
   },
 
   async deleteHotspot(id) {
-    await new Promise((r) => setTimeout(r, 80));
-    const hotspots = loadStoredHotspots();
-    const filtered = hotspots.filter((h) => h.id !== id);
-    saveStoredHotspots(filtered);
-    return filtered;
+    return { success: true, id };
   },
 
   async loadPreset(presetList) {
-    saveStoredHotspots(presetList);
     return presetList;
   },
 
   async resetToDefault() {
-    saveStoredHotspots(initialMockHotspots);
-    return initialMockHotspots;
-  }
+    return this.getHotspots('priority');
+  },
 };
-

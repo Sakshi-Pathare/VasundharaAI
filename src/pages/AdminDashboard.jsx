@@ -16,6 +16,7 @@ import {
   Sparkles,
   Radio,
   Trash2,
+  Download,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -49,7 +50,9 @@ export function AdminDashboard() {
   const [recentReports, setRecentReports] = useState([]);
   const [hotspots, setHotspots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [actionSuccess, setActionSuccess] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
     loadAllData();
@@ -78,17 +81,20 @@ export function AdminDashboard() {
   };
 
   const handleVerify = async (reportId) => {
+    setActionError(null);
     try {
       await reportService.updateReportStatus(reportId, 'verified');
       setActionSuccess(`Report ${reportId} marked as Verified.`);
       loadAllData();
       setTimeout(() => setActionSuccess(null), 3000);
     } catch (e) {
-      console.error(e);
+      setActionError(e.message || 'Failed to verify report.');
+      setTimeout(() => setActionError(null), 5000);
     }
   };
 
   const handleScheduleCleanup = async (reportId) => {
+    setActionError(null);
     try {
       const updated = await reportService.updateReportStatus(reportId, 'scheduled');
       await cleanupService.createTaskFromReport(updated);
@@ -96,7 +102,8 @@ export function AdminDashboard() {
       loadAllData();
       setTimeout(() => setActionSuccess(null), 3000);
     } catch (e) {
-      console.error(e);
+      setActionError(e.message || 'Failed to dispatch cleanup.');
+      setTimeout(() => setActionError(null), 5000);
     }
   };
 
@@ -104,13 +111,39 @@ export function AdminDashboard() {
     if (!window.confirm(`Are you sure you want to permanently remove report ${reportId}?`)) {
       return;
     }
+    setActionError(null);
     try {
       await reportService.deleteReport(reportId);
       setActionSuccess(`Report ${reportId} deleted successfully.`);
       loadAllData();
       setTimeout(() => setActionSuccess(null), 3000);
     } catch (e) {
-      console.error(e);
+      setActionError(e.message || 'Failed to delete report.');
+      setTimeout(() => setActionError(null), 5000);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    setActionError(null);
+    try {
+      const csvText = await reportService.exportReportsCsv();
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `ecowatch_reports_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setActionSuccess('Reports exported to CSV successfully.');
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (e) {
+      setActionError(e.message || 'Failed to export reports to CSV.');
+      setTimeout(() => setActionError(null), 5000);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -132,6 +165,16 @@ export function AdminDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Download}
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="shadow-xs font-bold rounded-full px-4 py-2"
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </Button>
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={loadAllData} className="shadow-xs font-bold rounded-full px-4 py-2">
             Refresh
           </Button>
@@ -147,6 +190,13 @@ export function AdminDashboard() {
         <div className="p-4 rounded-2xl bg-forest-50 border border-forest-200 text-forest-900 text-xs font-bold flex items-center gap-2.5 shadow-soft animate-fadeIn">
           <CheckCircle className="w-4 h-4 text-forest-600 shrink-0" />
           <span>{actionSuccess}</span>
+        </div>
+      )}
+
+      {actionError && (
+        <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold flex items-center gap-2.5 shadow-soft animate-fadeIn">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{actionError}</span>
         </div>
       )}
 

@@ -160,7 +160,7 @@ export function ReportLitterPage() {
         navigate('/my-reports');
       }, 1500);
     } catch (err) {
-      setFormError('Failed to record report. Please check storage capacity and try again.');
+      setFormError(err.message || 'Failed to record report. Please verify connection and try again.');
       setIsSubmitting(false);
     }
   };

@@ -1,173 +1,156 @@
-import { initialMockReports } from '../data/mockReports.js';
-import {
-  saveImageToIndexedDB,
-  getImageFromIndexedDB,
-  deleteImageFromIndexedDB,
-} from '../utils/imageStorage.js';
+/**
+ * Vasundhara AI — Pollution Report Service
+ * Connects directly to FastAPI backend (/api/v1/reports) for real-time incident reporting,
+ * geospatial routing, and municipal triage.
+ */
 
-const STORAGE_KEY = 'vasundhara_reports_v2_mh';
+import { api, getAuthToken, resolveAssetUrl } from './apiClient.js';
 
-function loadStoredReports() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialMockReports));
-      return initialMockReports;
-    }
-    const parsed = JSON.parse(raw);
-    // If old cached data is from foreign coordinates (e.g. San Francisco lat > 30 or lng < 0), auto-migrate to Maharashtra India
-    if (Array.isArray(parsed) && parsed.some(r => r.latitude > 30 || r.longitude < 0)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialMockReports));
-      return initialMockReports;
-    }
-    return parsed;
-  } catch (e) {
-    console.error('Failed to parse stored reports', e);
-    return initialMockReports;
-  }
-}
-
-function saveStoredReports(reports) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
-  } catch (e) {
-    console.warn('localStorage write failed, applying quota preservation fallback', e);
-    // If quota exceeded, strip large Data URLs from localStorage copy since IndexedDB preserves them
-    try {
-      const quotaSafeReports = reports.map((r) => {
-        if (r.imageUrl && r.imageUrl.startsWith('data:') && r.imageUrl.length > 30000) {
-          return { ...r, imageUrl: '' }; // Kept in IndexedDB
-        }
-        return r;
-      });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(quotaSafeReports));
-    } catch (fallbackError) {
-      console.error('Critical quota error in localStorage', fallbackError);
-    }
-  }
+function formatReport(raw) {
+  if (!raw) return null;
+  return {
+    ...raw,
+    id: raw.id,
+    title: raw.title || 'Untitled Incident',
+    description: raw.description || '',
+    latitude: Number(raw.latitude),
+    longitude: Number(raw.longitude),
+    address: raw.address || 'Geo-coordinate location',
+    category: raw.category || 'mixed',
+    severity: raw.severity || 'medium',
+    status: raw.status || 'pending',
+    jurisdictionStatus: raw.jurisdictionStatus || 'pending',
+    municipalityId: raw.municipalityId,
+    municipalityCode: raw.municipalityCode,
+    municipalityName: raw.municipalityName,
+    wardId: raw.wardId,
+    zoneId: raw.zoneId,
+    estimatedKg: Number(raw.estimatedKg || 1),
+    imageUrl: resolveAssetUrl(raw.imageUrl),
+    detectionNote: raw.detectionNote || '',
+    detections: raw.detections || [],
+    internalNotes: raw.internalNotes || '',
+    reportedAt: raw.reportedAt || new Date().toISOString(),
+    updatedAt: raw.updatedAt || raw.reportedAt || new Date().toISOString(),
+    reporterName: raw.reporterName || 'Citizen Steward',
+    reporterEmail: raw.reporterEmail,
+  };
 }
 
 export const reportService = {
+  /**
+   * Retrieves all reports matching filters.
+   * Dispatches to tenant-scoped /reports if authenticated as municipal/super admin,
+   * otherwise uses sanitized /public/reports.
+   */
   async getAllReports(filters = {}) {
-    await new Promise((r) => setTimeout(r, 120));
-    let reports = loadStoredReports();
+    const params = new URLSearchParams();
+    if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters.category && filters.category !== 'all') params.append('category', filters.category);
+    if (filters.severity && filters.severity !== 'all') params.append('severity', filters.severity);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.wardId) params.append('ward_id', filters.wardId);
 
-    // Asynchronously enrich any reports missing their full image from IndexedDB
-    const enriched = await Promise.all(
-      reports.map(async (r) => {
-        if (!r.imageUrl) {
-          const storedImg = await getImageFromIndexedDB(r.id);
-          if (storedImg) return { ...r, imageUrl: storedImg };
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+
+    // Check if user has an auth token
+    const token = getAuthToken();
+    let data;
+
+    if (token) {
+      try {
+        data = await api.get(`/reports${queryString}`);
+      } catch (err) {
+        // If forbidden (e.g. citizen token on admin route), fall back to public reports
+        if (err.isForbidden) {
+          data = await api.get(`/public/reports${queryString}`);
+        } else {
+          throw err;
         }
-        return r;
-      })
-    );
-    reports = enriched;
-
-    if (filters.severity && filters.severity !== 'all') {
-      reports = reports.filter((r) => r.severity === filters.severity);
-    }
-    if (filters.status && filters.status !== 'all') {
-      reports = reports.filter((r) => r.status === filters.status);
-    }
-    if (filters.category && filters.category !== 'all') {
-      reports = reports.filter((r) => r.category === filters.category);
-    }
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      reports = reports.filter(
-        (r) =>
-          r.title?.toLowerCase().includes(q) ||
-          r.description?.toLowerCase().includes(q) ||
-          r.address?.toLowerCase().includes(q) ||
-          r.id?.toLowerCase().includes(q)
-      );
-    }
-
-    return reports;
-  },
-
-  async getReportById(id) {
-    await new Promise((r) => setTimeout(r, 80));
-    const reports = loadStoredReports();
-    const report = reports.find((r) => r.id === id);
-    if (!report) return null;
-
-    if (!report.imageUrl) {
-      const storedImg = await getImageFromIndexedDB(report.id);
-      if (storedImg) {
-        return { ...report, imageUrl: storedImg };
       }
+    } else {
+      data = await api.get(`/public/reports${queryString}`);
     }
-    return report;
+
+    if (!Array.isArray(data)) return [];
+    return data.map(formatReport);
   },
 
-  async getUserReports(userId = 'usr_current') {
-    await new Promise((r) => setTimeout(r, 120));
-    const all = await this.getAllReports();
-    return all.filter((r) => r.reporterId === userId);
+  /**
+   * Retrieves the authenticated citizen's personal report history.
+   */
+  async getUserReports() {
+    const data = await api.get('/reports/mine');
+    if (!Array.isArray(data)) return [];
+    return data.map(formatReport);
   },
 
+  /**
+   * Retrieves details for a specific report by ID.
+   */
+  async getReportById(id) {
+    const data = await api.get(`/reports/${encodeURIComponent(id)}`);
+    return formatReport(data);
+  },
+
+  /**
+   * Submits a new citizen litter report to FastAPI backend.
+   */
   async createReport(reportData) {
-    await new Promise((r) => setTimeout(r, 200));
-    const reports = loadStoredReports();
-    const reportId = `REP-${Math.floor(2050 + Math.random() * 900)}`;
-
-    const newReport = {
-      id: reportId,
-      title: reportData.title || 'Untitled Litter Submission',
-      description: reportData.description || 'Litter reported via mobile/web client.',
-      latitude: Number(reportData.latitude) || 18.5204,
-      longitude: Number(reportData.longitude) || 73.8567,
-      address: reportData.address || 'Pune, Maharashtra',
+    const payload = {
+      title: reportData.title,
+      description: reportData.description || '',
+      latitude: Number(reportData.latitude),
+      longitude: Number(reportData.longitude),
+      address: reportData.address || '',
       category: reportData.category || 'mixed',
       severity: reportData.severity || 'medium',
-      status: 'pending',
-      reportedAt: new Date().toISOString(),
-      reporterName: reportData.reporterName || 'Pooja Kulkarni',
-      reporterId: 'usr_current',
-      estimatedKg: Number(reportData.estimatedKg) || 4.0,
-      imageUrl: reportData.imageUrl || 'https://images.unsplash.com/photo-1605600659908-0ef719419d41?auto=format&fit=crop&w=800&q=80',
-      detectionNote: 'Uploaded report received. Verified via client-side intake pipeline.',
+      estimatedKg: Number(reportData.estimatedKg || 1),
+      imageUrl: reportData.imageUrl || null,
     };
 
-    // Store high-res photo in IndexedDB if it is a Data URL
-    if (newReport.imageUrl && newReport.imageUrl.startsWith('data:')) {
-      await saveImageToIndexedDB(reportId, newReport.imageUrl);
-    }
-
-    const updated = [newReport, ...reports];
-    saveStoredReports(updated);
-    return newReport;
+    const response = await api.post('/reports', payload);
+    return formatReport(response);
   },
 
-  async updateReportStatus(id, newStatus) {
-    await new Promise((r) => setTimeout(r, 150));
-    const reports = loadStoredReports();
-    const index = reports.findIndex((r) => r.id === id);
-    if (index !== -1) {
-      reports[index] = { ...reports[index], status: newStatus };
-      saveStoredReports(reports);
-      return reports[index];
-    }
-    throw new Error('Report not found');
+  /**
+   * Updates report verification status (admin only).
+   */
+  async updateReportStatus(id, newStatus, afterImageUrl = null) {
+    const payload = {
+      status: newStatus,
+      afterImageUrl: afterImageUrl || null,
+    };
+    const response = await api.patch(`/reports/${encodeURIComponent(id)}/status`, payload);
+    return formatReport(response);
   },
 
+  /**
+   * Updates internal municipal operational notes (admin only).
+   */
+  async updateInternalNotes(id, note) {
+    const response = await api.patch(`/reports/${encodeURIComponent(id)}/notes`, { note });
+    return formatReport(response);
+  },
+
+  /**
+   * Retrieves audit and status history for a report.
+   */
+  async getReportHistory(id) {
+    return await api.get(`/reports/${encodeURIComponent(id)}/history`);
+  },
+
+  /**
+   * Deletes a report (admin only).
+   */
   async deleteReport(id) {
-    await new Promise((r) => setTimeout(r, 150));
-    const reports = loadStoredReports();
-    const filtered = reports.filter((r) => r.id !== id);
-    if (filtered.length === reports.length) {
-      throw new Error(`Report ${id} not found.`);
-    }
-    saveStoredReports(filtered);
-    await deleteImageFromIndexedDB(id);
-    return true;
+    return await api.delete(`/reports/${encodeURIComponent(id)}`);
   },
 
-  async resetToDefaults() {
-    saveStoredReports(initialMockReports);
-    return initialMockReports;
-  }
+  /**
+   * Exports filtered reports as a CSV download.
+   */
+  async exportReportsCsv() {
+    return await api.get('/reports/export.csv', { responseType: 'text' });
+  },
 };
-

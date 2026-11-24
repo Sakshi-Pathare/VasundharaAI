@@ -1,134 +1,81 @@
-import { initialMockCleanups } from '../data/mockCleanups.js';
-import { reportService } from './reportService.js';
+/**
+ * Vasundhara AI — Cleanup Workflow Service
+ * Connects directly to FastAPI backend (/api/v1/cleanups) for sanitation crew dispatching,
+ * photo-verified cleanup workflows, and status tracking.
+ */
 
-const STORAGE_KEY = 'vasundhara_cleanups_v2_mh';
+import { api, resolveAssetUrl } from './apiClient.js';
 
-function loadStoredCleanups() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialMockCleanups));
-      return initialMockCleanups;
-    }
-    const parsed = JSON.parse(raw);
-    // If old cached data contains legacy US addresses, auto-migrate to Maharashtra India
-    if (Array.isArray(parsed) && parsed.some(c => c.location && c.location.includes('McAllister'))) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialMockCleanups));
-      return initialMockCleanups;
-    }
-    return parsed;
-  } catch (e) {
-    console.error('Failed to parse stored cleanups', e);
-    return initialMockCleanups;
-  }
-}
-
-function saveStoredCleanups(cleanups) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanups));
-  } catch (e) {
-    console.error('Failed to save cleanups', e);
-  }
+function formatCleanup(raw) {
+  if (!raw) return null;
+  return {
+    ...raw,
+    id: raw.id,
+    reportId: raw.reportId,
+    taskName: raw.taskName || 'Remediation Task',
+    location: raw.location || 'Municipal Sector',
+    assignedTeam: raw.assignedTeam || 'Unassigned Crew',
+    contactLead: raw.contactLead || 'Sanitation Dispatch',
+    scheduledDate: raw.scheduledDate || null,
+    status: raw.status || 'pending',
+    priority: raw.priority || 'medium',
+    estimatedHours: Number(raw.estimatedHours || 1.5),
+    wasteVolumeEstimate: raw.wasteVolumeEstimate || '',
+    beforeImageUrl: resolveAssetUrl(raw.beforeImageUrl),
+    afterImageUrl: resolveAssetUrl(raw.afterImageUrl),
+    notes: raw.notes || '',
+    completedAt: raw.completedAt || null,
+    createdAt: raw.createdAt || new Date().toISOString(),
+    updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString(),
+  };
 }
 
 export const cleanupService = {
+  /**
+   * Retrieves cleanup tasks filtered by status.
+   */
   async getCleanups(status = 'all') {
-    await new Promise((r) => setTimeout(r, 120));
-    let cleanups = loadStoredCleanups();
-    if (status !== 'all') {
-      cleanups = cleanups.filter((c) => c.status === status);
-    }
-    return cleanups;
+    const query = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
+    const data = await api.get(`/cleanups${query}`);
+    if (!Array.isArray(data)) return [];
+    return data.map(formatCleanup);
   },
 
-  async updateTaskStatus(id, newStatus, afterImageUrl = null) {
-    await new Promise((r) => setTimeout(r, 150));
-    const cleanups = loadStoredCleanups();
-    const index = cleanups.findIndex((c) => c.id === id);
-    if (index !== -1) {
-      const task = cleanups[index];
-      cleanups[index] = {
-        ...task,
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
-        ...(newStatus === 'completed' ? {
-          completedAt: new Date().toISOString(),
-          afterImageUrl: afterImageUrl || task.afterImageUrl || 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80',
-        } : {}),
-      };
-      saveStoredCleanups(cleanups);
-
-      // Bi-directional state synchronization with reportService
-      if (task.reportId) {
-        try {
-          if (newStatus === 'completed') {
-            await reportService.updateReportStatus(task.reportId, 'cleaned');
-          } else if (newStatus === 'in_progress') {
-            await reportService.updateReportStatus(task.reportId, 'scheduled');
-          }
-        } catch (syncErr) {
-          console.warn('Could not update linked report status', syncErr);
-        }
-      }
-
-      return cleanups[index];
-    }
-    throw new Error('Cleanup task not found');
-  },
-
-  async assignTask(id, teamName, scheduledDate) {
-    await new Promise((r) => setTimeout(r, 150));
-    const cleanups = loadStoredCleanups();
-    const index = cleanups.findIndex((c) => c.id === id);
-    if (index !== -1) {
-      cleanups[index] = {
-        ...cleanups[index],
-        assignedTeam: teamName,
-        scheduledDate: scheduledDate,
-        updatedAt: new Date().toISOString(),
-      };
-      saveStoredCleanups(cleanups);
-      return cleanups[index];
-    }
-    throw new Error('Cleanup task not found');
-  },
-
-  async createTaskFromReport(report, assignedTeam = 'Metro Rapid Response - Squad A', scheduledDate = null) {
-    await new Promise((r) => setTimeout(r, 150));
-    const cleanups = loadStoredCleanups();
-
-    // Check if task already exists for this report
-    const existing = cleanups.find((c) => c.reportId === report.id);
-    if (existing) {
-      existing.status = 'pending';
-      existing.assignedTeam = assignedTeam;
-      existing.scheduledDate = scheduledDate || new Date(Date.now() + 86400000).toISOString();
-      existing.updatedAt = new Date().toISOString();
-      saveStoredCleanups(cleanups);
-      return existing;
-    }
-
-    const newTask = {
-      id: `CLN-${Math.floor(810 + Math.random() * 190)}`,
+  /**
+   * Creates a new cleanup task from an identified report.
+   */
+  async createTaskFromReport(report, assignedTeam = 'Municipal Sanitation Crew', scheduledDate = null) {
+    const payload = {
       reportId: report.id,
-      taskName: `${report.title} Clearance`,
-      location: report.address || 'Reported Location',
-      assignedTeam: assignedTeam,
-      contactLead: 'Operations Dispatch Lead',
-      scheduledDate: scheduledDate || new Date(Date.now() + 86400000).toISOString(),
-      status: 'pending',
-      priority: report.severity || 'medium',
-      estimatedHours: (report.estimatedKg || 5) > 20 ? 3.5 : 1.5,
-      wasteVolumeEstimate: `${report.estimatedKg || 5} kg`,
-      beforeImageUrl: report.imageUrl || null,
-      afterImageUrl: null,
-      notes: `Generated from incident report (${report.id}): ${report.description || 'Civic litter removal required.'}`,
-      updatedAt: new Date().toISOString(),
+      assignedTeam: assignedTeam || 'Municipal Sanitation Crew',
+      scheduledDate: scheduledDate || null,
     };
+    const response = await api.post('/cleanups', payload);
+    return formatCleanup(response);
+  },
 
-    const updated = [newTask, ...cleanups];
-    saveStoredCleanups(updated);
-    return newTask;
-  }
+  /**
+   * Assigns or reschedules a cleanup crew.
+   */
+  async assignTask(id, teamName, scheduledDate) {
+    const payload = {
+      assignedTeam: teamName,
+      scheduledDate: scheduledDate || null,
+    };
+    const response = await api.patch(`/cleanups/${encodeURIComponent(id)}/assign`, payload);
+    return formatCleanup(response);
+  },
+
+  /**
+   * Updates task status (e.g. in_progress, completed).
+   * Note: marking completed requires an afterImageUrl for verified completion.
+   */
+  async updateTaskStatus(id, newStatus, afterImageUrl = null) {
+    const payload = {
+      status: newStatus,
+      afterImageUrl: afterImageUrl || null,
+    };
+    const response = await api.patch(`/cleanups/${encodeURIComponent(id)}/status`, payload);
+    return formatCleanup(response);
+  },
 };
-

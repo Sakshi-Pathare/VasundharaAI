@@ -39,7 +39,7 @@ export function UserDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const userReports = await reportService.getUserReports('usr_current');
+      const userReports = await reportService.getUserReports();
       setReports(userReports);
     } catch (e) {
       console.error(e);

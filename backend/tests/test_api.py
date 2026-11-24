@@ -401,3 +401,181 @@ def test_health_and_geojson_municipality_admin_setup():
             "email": "unauthorized@example.test",
             "password": "unauthorized-password-2026",
         }).status_code == 403
+
+
+def test_full_lifecycle_citizen_to_cleanup():
+    """
+    Validates complete end-to-end integration:
+    1. Citizen registers and authenticates -> gets valid JWT.
+    2. Citizen submits litter report within PMC boundary.
+    3. Municipal Admin logs in and inspects report in triage queue.
+    4. Admin verifies report and updates internal notes.
+    5. Admin dispatches cleanup task for the report.
+    6. Admin assigns squad and schedules date.
+    7. Squad completes cleanup with mandatory after-photo evidence.
+    8. Verifies linked report automatically transitions to 'cleaned'.
+    9. Verifies citizen's `/reports/mine` endpoint reflects 'cleaned' status.
+    10. Verifies CSV export contains the report record.
+    11. Verifies public analytics reflect 1 total report and 1 completed cleanup.
+    """
+    with TestClient(app) as client:
+        # 1. Citizen registers and authenticates
+        reg_resp = client.post("/api/v1/auth/register", json={
+            "name": "Aarav Patil",
+            "email": "aarav.patil@example.test",
+            "phone": "+91-9876543210",
+            "password": "aarav-secure-pass-2026",
+        })
+        assert reg_resp.status_code == 201
+        citizen_token = reg_resp.json()["accessToken"]
+        citizen_headers = {"Authorization": f"Bearer {citizen_token}"}
+
+        # Verify /auth/me returns citizen profile
+        me_resp = client.get("/api/v1/auth/me", headers=citizen_headers)
+        assert me_resp.status_code == 200
+        assert me_resp.json()["email"] == "aarav.patil@example.test"
+        assert me_resp.json()["role"] == "citizen"
+
+        # 2. Citizen submits litter report inside PMC boundary (lat 18.50, lon 73.95)
+        report_payload = {
+            "title": "Illegal roadside dump near Shivaji Nagar",
+            "description": "Large plastic accumulation blocking storm drain.",
+            "latitude": 18.50,
+            "longitude": 73.95,
+            "address": "Shivaji Nagar, Pune, Maharashtra",
+            "category": "plastic",
+            "severity": "high",
+            "estimatedKg": 45.0,
+            "imageUrl": "https://images.unsplash.com/photo-1604187351574-c75ca79f5807",
+        }
+        create_resp = client.post("/api/v1/reports", json=report_payload, headers=citizen_headers)
+        assert create_resp.status_code == 201
+        report_data = create_resp.json()
+        report_id = report_data["id"]
+        assert report_id.startswith("EW-")
+        assert report_data["status"] == "pending"
+        assert report_data["municipalityId"] == "PMC"
+
+        # Verify report appears in citizen's own list
+        my_reports_resp = client.get("/api/v1/reports/mine", headers=citizen_headers)
+        assert my_reports_resp.status_code == 200
+        my_reports = my_reports_resp.json()
+        assert len(my_reports) == 1
+        assert my_reports[0]["id"] == report_id
+
+        # 3. Municipal Admin logs in
+        login_resp = client.post("/api/v1/auth/login", json={
+            "email": "pmc@example.test",
+            "password": "PMC-test-password-2026",
+        })
+        assert login_resp.status_code == 200
+        admin_token = login_resp.json()["accessToken"]
+        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+        # Admin lists all reports
+        admin_reports_resp = client.get("/api/v1/reports", headers=admin_headers)
+        assert admin_reports_resp.status_code == 200
+        admin_reports = admin_reports_resp.json()
+        assert any(r["id"] == report_id for r in admin_reports)
+
+        # 4. Admin verifies report and adds internal notes
+        verify_resp = client.patch(
+            f"/api/v1/reports/{report_id}/status",
+            json={"status": "verified"},
+            headers=admin_headers,
+        )
+        assert verify_resp.status_code == 200
+        assert verify_resp.json()["status"] == "verified"
+
+        note_resp = client.patch(
+            f"/api/v1/reports/{report_id}/notes",
+            json={"note": "Verified by Ward inspection team. High flood risk."},
+            headers=admin_headers,
+        )
+        assert note_resp.status_code == 200
+        assert note_resp.json()["internalNotes"] == "Verified by Ward inspection team. High flood risk."
+
+        # 5. Dispatch cleanup task for the report
+        cleanup_resp = client.post(
+            "/api/v1/cleanups",
+            json={
+                "reportId": report_id,
+                "assignedTeam": "Rapid Response Alpha",
+                "scheduledDate": "2026-12-01",
+            },
+            headers=admin_headers,
+        )
+        assert cleanup_resp.status_code == 201
+        cleanup_data = cleanup_resp.json()
+        cleanup_id = cleanup_data["id"]
+        assert cleanup_id.startswith("CLN-")
+        assert cleanup_data["status"] == "pending"
+        assert cleanup_data["assignedTeam"] == "Rapid Response Alpha"
+
+        # 6. Assign squad on cleanup
+        assign_resp = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/assign",
+            json={
+                "assignedTeam": "Pune Central Sanitation Crew #3",
+                "scheduledDate": "2026-12-02",
+            },
+            headers=admin_headers,
+        )
+        assert assign_resp.status_code == 200
+        assert assign_resp.json()["assignedTeam"] == "Pune Central Sanitation Crew #3"
+
+        # Update status to in_progress
+        progress_resp = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/status",
+            json={"status": "in_progress"},
+            headers=admin_headers,
+        )
+        assert progress_resp.status_code == 200
+        assert progress_resp.json()["status"] == "in_progress"
+
+        # 7. Complete cleanup: Attempting completion without after_image_url MUST fail with 422
+        fail_complete_resp = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/status",
+            json={"status": "completed"},
+            headers=admin_headers,
+        )
+        assert fail_complete_resp.status_code == 422
+        assert "after-cleanup photo" in fail_complete_resp.text
+
+        # Now complete cleanup with mandatory photographic evidence
+        complete_resp = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/status",
+            json={
+                "status": "completed",
+                "afterImageUrl": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09",
+                "notes": "Footpath and drain cleared. 45kg sorted and dispatched to recycling.",
+            },
+            headers=admin_headers,
+        )
+        assert complete_resp.status_code == 200
+        assert complete_resp.json()["status"] == "completed"
+        assert complete_resp.json()["afterImageUrl"] is not None
+
+        # 8. Linked report must automatically transition to 'cleaned'
+        cleaned_report_resp = client.get(f"/api/v1/reports/{report_id}", headers=admin_headers)
+        assert cleaned_report_resp.status_code == 200
+        assert cleaned_report_resp.json()["status"] == "cleaned"
+
+        # 9. Citizen's view reflects the updated 'cleaned' status
+        citizen_my_reports = client.get("/api/v1/reports/mine", headers=citizen_headers).json()
+        assert citizen_my_reports[0]["status"] == "cleaned"
+
+        # 10. CSV export contains the report
+        csv_resp = client.get("/api/v1/reports/export.csv", headers=admin_headers)
+        assert csv_resp.status_code == 200
+        assert "text/csv" in csv_resp.headers["content-type"]
+        assert report_id in csv_resp.text
+        assert "PMC" in csv_resp.text
+
+        # 11. Public and dashboard analytics reflect the completed workflow
+        metrics_resp = client.get("/api/v1/analytics/metrics", headers=admin_headers)
+        assert metrics_resp.status_code == 200
+        metrics = metrics_resp.json()
+        assert metrics["totalReports"] >= 1
+        assert metrics["completedCleanups"] >= 1
+

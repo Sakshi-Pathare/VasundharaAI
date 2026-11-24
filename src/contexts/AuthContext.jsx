@@ -8,31 +8,49 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
-  // Hydrate user on mount
+  // Hydrate user on mount with real backend token validation
   useEffect(() => {
     let mounted = true;
-    authService
-      .getCurrentUser()
-      .then((activeUser) => {
+
+    async function initSession() {
+      try {
+        const activeUser = await authService.getCurrentUser();
         if (!mounted) return;
-        // Default to citizen demo if nothing exists yet, ensuring an effortless first-time experience
-        if (!activeUser) {
-          const defaultUser = DEMO_PROFILES.citizen;
-          setUser(defaultUser);
-          localStorage.setItem('vasundhara_current_user_v2', JSON.stringify(defaultUser));
-        } else {
+
+        if (activeUser) {
           setUser(activeUser);
+        } else if (import.meta.env.DEV) {
+          // In local dev, initialize with demo citizen token for seamless evaluation
+          try {
+            const demoUser = await authService.loginDemo('citizen');
+            if (mounted) setUser(demoUser);
+          } catch {
+            if (mounted) setUser(null);
+          }
+        } else {
+          setUser(null);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (mounted) setLoadError(err.message || 'Unable to verify session.');
-      })
-      .finally(() => {
+      } finally {
         if (mounted) setLoading(false);
-      });
+      }
+    }
+
+    initSession();
+
+    // Listen for global 401 session expiration event dispatched by apiClient
+    const handleUnauthorized = () => {
+      if (mounted) {
+        setUser(null);
+        authService.logout();
+      }
+    };
+    window.addEventListener('vasundhara:unauthorized', handleUnauthorized);
 
     return () => {
       mounted = false;
+      window.removeEventListener('vasundhara:unauthorized', handleUnauthorized);
     };
   }, []);
 

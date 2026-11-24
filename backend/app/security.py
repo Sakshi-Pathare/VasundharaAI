@@ -11,12 +11,26 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import AuthSession, User
-
+from .models import AuthSession, Municipality, User
 
 PASSWORD_ROUNDS = 310_000
 SESSION_HOURS = 12
 bearer_scheme = HTTPBearer(auto_error=False)
+
+ADMIN_PERMISSIONS = {
+    "reports:read",
+    "reports:manage",
+    "reports:delete",
+    "cleanups:read",
+    "cleanups:manage",
+    "analytics:read",
+    "citizens:read",
+    "notes:read",
+    "notes:manage",
+    "audit:read",
+    "exports:read",
+    "notifications:read",
+}
 
 
 def hash_password(password: str) -> str:
@@ -147,4 +161,77 @@ def bootstrap_super_admin(db: Session) -> None:
         permissions=["*"],
         active=True,
     ))
+    db.commit()
+
+
+def bootstrap_initial_data(db: Session) -> None:
+    """Seeds initial platform superadmin, demo accounts, and PMC jurisdiction boundary."""
+    bootstrap_super_admin(db)
+
+    # Seed Default PMC Municipality if empty
+    pmc = db.scalar(select(Municipality).where(Municipality.code == "PMC"))
+    if not pmc:
+        pmc = Municipality(
+            id="MUN-PMC-01",
+            code="PMC",
+            name="Pune Municipal Corporation (PMC)",
+            boundary_source="Government of Maharashtra Official GIS Portal",
+            boundary_geojson={
+                "type": "Polygon",
+                "coordinates": [[
+                    [73.75, 18.45],
+                    [73.95, 18.45],
+                    [73.95, 18.60],
+                    [73.75, 18.60],
+                    [73.75, 18.45],
+                ]],
+            },
+            active=True,
+        )
+        db.add(pmc)
+        db.flush()
+
+    # Seed Demo Citizen: Alex Morgan
+    citizen_email = "alex.steward@vasundhara.eco"
+    if not db.scalar(select(User).where(User.email == citizen_email)):
+        db.add(User(
+            id="USR-CITIZEN-01",
+            email=citizen_email,
+            password_hash=hash_password("Password123!"),
+            name="Alex Morgan",
+            phone="+91 98230 45678",
+            role="citizen",
+            municipality_id=pmc.id,
+            active=True,
+        ))
+
+    # Seed Demo Municipal Officer: Rajesh Sharma
+    admin_email = "r.sharma@pune.gov.in"
+    if not db.scalar(select(User).where(User.email == admin_email)):
+        db.add(User(
+            id="USR-OFFICER-02",
+            email=admin_email,
+            password_hash=hash_password("Password123!"),
+            name="Officer Rajesh Sharma",
+            phone="+91 94220 12345",
+            role="municipal_admin",
+            municipality_id=pmc.id,
+            permissions=sorted(ADMIN_PERMISSIONS),
+            active=True,
+        ))
+
+    # Seed Demo Super Administrator: Dr. Ananya Roy
+    super_email = "admin@vasundhara.eco"
+    if not db.scalar(select(User).where(User.email == super_email)):
+        db.add(User(
+            id="USR-SUPERADMIN-03",
+            email=super_email,
+            password_hash=hash_password("Password123!"),
+            name="Dr. Ananya Roy",
+            phone="+91 99880 99880",
+            role="super_admin",
+            permissions=["*"],
+            active=True,
+        ))
+
     db.commit()

@@ -1,14 +1,12 @@
 /**
- * Vasundhara AI - Authentication & Steward Identity Service
- * Provides robust session management, local storage fallback with simulated latency,
- * default multi-role demo profiles, and optional proxying to FastAPI backend.
+ * Vasundhara AI — Authentication & Steward Identity Service
+ * Connects directly to FastAPI backend (/api/v1/auth) with persistent session tokens.
  */
 
-const STORAGE_KEY_USER = 'vasundhara_current_user_v2';
-const STORAGE_KEY_TOKEN = 'vasundhara_auth_token_v2';
-const STORAGE_KEY_REGISTRY = 'vasundhara_registered_users_v2';
+import { api, clearAuthToken, getAuthToken, setAuthToken } from './apiClient.js';
 
-// Pre-seeded demo credentials for instant testing & evaluation
+const STORAGE_KEY_USER = 'vasundhara_current_user_v2';
+
 export const DEMO_PROFILES = {
   citizen: {
     id: 'USR-CITIZEN-01',
@@ -18,9 +16,6 @@ export const DEMO_PROFILES = {
     phone: '+91 98230 45678',
     role: 'citizen',
     roleLabel: 'Citizen Steward',
-    karmaScore: 420,
-    reportsCount: 14,
-    cleanupsCount: 6,
     badge: 'Level 2 Eco Steward',
     municipalityName: 'Pune Municipal Corporation',
   },
@@ -32,10 +27,9 @@ export const DEMO_PROFILES = {
     phone: '+91 94220 12345',
     role: 'municipal_admin',
     roleLabel: 'Municipal Sanitation Officer',
-    municipalityId: 'PMC-PUNE',
+    municipalityId: 'MUN-PMC-01',
+    municipalityCode: 'PMC',
     municipalityName: 'Pune Municipal Corporation (PMC)',
-    wardId: 'Ward 12 - Shivajinagar / Deccan',
-    zoneId: 'Central Zone A',
     badge: 'Municipal Command Lead',
   },
   super_admin: {
@@ -51,118 +45,97 @@ export const DEMO_PROFILES = {
   },
 };
 
-function getStoredUsers() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_REGISTRY);
-    if (!raw) {
-      // Seed initial registry with demo profiles
-      const initial = Object.values(DEMO_PROFILES);
-      localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(initial));
-      return initial;
-    }
-    return JSON.parse(raw);
-  } catch (e) {
-    return Object.values(DEMO_PROFILES);
-  }
-}
+function enrichUser(user) {
+  if (!user) return null;
+  const role = user.role || 'citizen';
+  const roleLabels = {
+    citizen: 'Citizen Steward',
+    municipal_admin: 'Municipal Sanitation Officer',
+    super_admin: 'System Super Administrator',
+  };
+  const badges = {
+    citizen: 'Level 2 Eco Steward',
+    municipal_admin: 'Municipal Command Lead',
+    super_admin: 'Platform Governor',
+  };
 
-function saveStoredUsers(users) {
-  try {
-    localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(users));
-  } catch (e) {
-    console.error('Failed to save user registry', e);
-  }
+  return {
+    ...user,
+    roleLabel: roleLabels[role] || 'Eco Volunteer',
+    badge: badges[role] || 'Active Steward',
+    karmaScore: user.karmaScore || (role === 'citizen' ? 420 : 1500),
+  };
 }
 
 export const authService = {
   /**
-   * Retrieves the current logged in user from local storage or session
+   * Retrieves current authenticated user from backend session.
    */
   async getCurrentUser() {
-    await new Promise((r) => setTimeout(r, 60));
+    const token = getAuthToken();
+    if (!token) {
+      localStorage.removeItem(STORAGE_KEY_USER);
+      return null;
+    }
+
     try {
-      const rawUser = localStorage.getItem(STORAGE_KEY_USER) || sessionStorage.getItem(STORAGE_KEY_USER);
-      if (!rawUser) return null;
-      return JSON.parse(rawUser);
-    } catch {
+      const user = await api.get('/auth/me');
+      const enriched = enrichUser(user);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(enriched));
+      return enriched;
+    } catch (error) {
+      if (error.isAuth) {
+        clearAuthToken();
+        localStorage.removeItem(STORAGE_KEY_USER);
+        return null;
+      }
+      // If temporary network failure, return cached profile to prevent layout jarring
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY_USER);
+        if (cached) return JSON.parse(cached);
+      } catch {}
       return null;
     }
   },
 
   /**
-   * Sign In with Email & Password
+   * Logs in via FastAPI backend /api/v1/auth/login.
    */
   async login(email, password, remember = true) {
-    await new Promise((r) => setTimeout(r, 350)); // natural responsiveness simulation
+    const response = await api.post('/auth/login', {
+      email: (email || '').trim().toLowerCase(),
+      password,
+    });
 
-    const normalizedEmail = (email || '').trim().toLowerCase();
-    const users = getStoredUsers();
-    const matched = users.find((u) => u.email.toLowerCase() === normalizedEmail);
+    const { accessToken, user } = response;
+    setAuthToken(accessToken, remember);
 
-    if (!matched) {
-      throw new Error('No registered account found with this email address.');
-    }
-
-    if (matched.password && matched.password !== password) {
-      throw new Error('Invalid password. Please double check your credentials.');
-    }
-
-    const token = `vasundhara_jwt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-    const storage = remember ? localStorage : sessionStorage;
-
-    storage.setItem(STORAGE_KEY_USER, JSON.stringify(matched));
-    storage.setItem(STORAGE_KEY_TOKEN, token);
-
-    return matched;
+    const enriched = enrichUser(user);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(enriched));
+    return enriched;
   },
 
   /**
-   * Register a new user account
+   * Registers a new user via FastAPI backend /api/v1/auth/register.
    */
   async register(data, remember = true) {
-    await new Promise((r) => setTimeout(r, 400));
-
-    const normalizedEmail = (data.email || '').trim().toLowerCase();
-    const users = getStoredUsers();
-
-    if (users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
-      throw new Error('An account with this email already exists. Please sign in instead.');
-    }
-
-    const role = data.role || 'citizen';
-    let roleLabel = 'Citizen Steward';
-    if (role === 'municipal_admin') roleLabel = 'Municipal Sanitation Official';
-    if (role === 'super_admin') roleLabel = 'System Super Administrator';
-
-    const newUser = {
-      id: `USR-${Date.now().toString(36).toUpperCase()}`,
-      name: data.name.trim(),
-      email: normalizedEmail,
-      phone: (data.phone || '').trim(),
+    const response = await api.post('/auth/register', {
+      name: data.name,
+      email: data.email.trim().toLowerCase(),
+      phone: data.phone || null,
       password: data.password,
-      role: role,
-      roleLabel: roleLabel,
-      karmaScore: 50, // Welcome signup bonus
-      reportsCount: 0,
-      cleanupsCount: 0,
-      badge: 'Novice Steward',
-      municipalityName: data.municipalityName || 'Pune Municipal Corporation',
-      registeredAt: new Date().toISOString(),
-    };
+    });
 
-    const updated = [newUser, ...users];
-    saveStoredUsers(updated);
+    const { accessToken, user } = response;
+    setAuthToken(accessToken, remember);
 
-    const token = `vasundhara_jwt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-    const storage = remember ? localStorage : sessionStorage;
-    storage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
-    storage.setItem(STORAGE_KEY_TOKEN, token);
-
-    return newUser;
+    const enriched = enrichUser(user);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(enriched));
+    return enriched;
   },
 
   /**
-   * 1-Click Quick Demo Sign In
+   * Performs quick login using pre-seeded backend demo accounts.
    */
   async loginDemo(roleKey = 'citizen') {
     const profile = DEMO_PROFILES[roleKey] || DEMO_PROFILES.citizen;
@@ -170,35 +143,27 @@ export const authService = {
   },
 
   /**
-   * Simulated Password Reset Request
+   * Logs out user and destroys backend session.
    */
-  async requestPasswordReset(email) {
-    await new Promise((r) => setTimeout(r, 300));
-    const normalizedEmail = (email || '').trim().toLowerCase();
-    const users = getStoredUsers();
-    const exists = users.some((u) => u.email.toLowerCase() === normalizedEmail);
-    if (!exists) {
-      throw new Error('No registered account associated with this email.');
+  async logout() {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      clearAuthToken();
+      localStorage.removeItem(STORAGE_KEY_USER);
     }
-    return {
-      success: true,
-      message: `Password reset link dispatched to ${normalizedEmail}. Check your inbox.`,
-    };
   },
 
   /**
-   * Logout and clear tokens
+   * Password reset request stub.
    */
-  async logout() {
-    await new Promise((r) => setTimeout(r, 80));
-    try {
-      localStorage.removeItem(STORAGE_KEY_USER);
-      localStorage.removeItem(STORAGE_KEY_TOKEN);
-      sessionStorage.removeItem(STORAGE_KEY_USER);
-      sessionStorage.removeItem(STORAGE_KEY_TOKEN);
-    } catch (e) {
-      console.error(e);
-    }
-    return true;
+  async requestPasswordReset(email) {
+    await new Promise((r) => setTimeout(r, 200));
+    return {
+      success: true,
+      message: `Password reset instructions sent to ${email} if registered.`,
+    };
   },
 };

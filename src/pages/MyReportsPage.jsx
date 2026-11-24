@@ -29,6 +29,7 @@ import { formatDate, formatRelativeTime } from '../utils/dateUtils';
 export function MyReportsPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'verified' | 'scheduled' | 'cleaned'
@@ -40,11 +41,12 @@ export function MyReportsPage() {
 
   const loadReports = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const userReports = await reportService.getUserReports('usr_current');
+      const userReports = await reportService.getUserReports();
       setReports(userReports);
     } catch (e) {
-      console.error(e);
+      setError(e.message || 'Unable to load incident reports from server.');
     } finally {
       setLoading(false);
     }
@@ -100,6 +102,13 @@ export function MyReportsPage() {
         <div className="p-4 rounded-2xl bg-sage-50 border border-sage-300 text-darkgreen-950 text-xs font-bold flex items-center gap-2.5 shadow-soft animate-fadeIn">
           <CheckCircle className="w-4 h-4 text-botanical-600 shrink-0" />
           <span>{deleteSuccess}</span>
+        </div>
+      )}
+
+      {error && (
+        <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold flex items-center gap-2.5 shadow-soft animate-fadeIn">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 

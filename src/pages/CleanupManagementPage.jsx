@@ -39,6 +39,7 @@ export function CleanupManagementPage() {
   const [assignedTeamInput, setAssignedTeamInput] = useState('');
   const [scheduledDateInput, setScheduledDateInput] = useState('');
   const [statusNotification, setStatusNotification] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
@@ -47,30 +48,34 @@ export function CleanupManagementPage() {
 
   const loadCleanups = async () => {
     setLoading(true);
+    setErrorMessage(null);
     try {
       const data = await cleanupService.getCleanups(activeTab);
       setCleanups(data);
     } catch (e) {
-      console.error(e);
+      setErrorMessage(e.message || 'Unable to load cleanup tasks.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleStatusChange = async (taskId, newStatus, afterImageUrl = null) => {
+    setErrorMessage(null);
     try {
       await cleanupService.updateTaskStatus(taskId, newStatus, afterImageUrl);
       setStatusNotification(`Task ${taskId} status updated to: ${newStatus.replace('_', ' ').toUpperCase()}`);
       loadCleanups();
       setTimeout(() => setStatusNotification(null), 3000);
     } catch (e) {
-      console.error(e);
+      setErrorMessage(e.message || 'Failed to update task status.');
+      setTimeout(() => setErrorMessage(null), 5000);
     }
   };
 
   const handleAssignSave = async (e) => {
     e.preventDefault();
     if (!assignModalTask) return;
+    setErrorMessage(null);
 
     try {
       await cleanupService.assignTask(
@@ -83,7 +88,8 @@ export function CleanupManagementPage() {
       loadCleanups();
       setTimeout(() => setStatusNotification(null), 3000);
     } catch (e) {
-      console.error(e);
+      setErrorMessage(e.message || 'Failed to assign team.');
+      setTimeout(() => setErrorMessage(null), 5000);
     }
   };
 
@@ -125,6 +131,13 @@ export function CleanupManagementPage() {
         <div className="p-4 rounded-2xl bg-[#DEF5F1] border border-[#74D7CB] text-[#092421] text-xs font-bold flex items-center gap-2.5 shadow-soft animate-fadeIn">
           <CheckCircle className="w-4 h-4 text-[#2D6A4F] shrink-0" />
           <span>{statusNotification}</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold flex items-center gap-2.5 shadow-soft animate-fadeIn">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{errorMessage}</span>
         </div>
       )}
 

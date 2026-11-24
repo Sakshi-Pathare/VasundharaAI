@@ -36,6 +36,7 @@ export function PollutionMapPage() {
   const [reports, setReports] = useState([]);
   const [hotspots, setHotspots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('map'); // 'map' | 'list'
   const [selectedReport, setSelectedReport] = useState(null);
   const [mapCenter, setMapCenter] = useState([18.5204, 73.8567]);
@@ -54,6 +55,7 @@ export function PollutionMapPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [fetchedReports, fetchedHotspots] = await Promise.all([
         reportService.getAllReports({
@@ -67,7 +69,7 @@ export function PollutionMapPage() {
       setReports(fetchedReports);
       setHotspots(fetchedHotspots);
     } catch (e) {
-      console.error(e);
+      setError(e.message || 'Unable to load real-time GIS pollution telemetry.');
     } finally {
       setLoading(false);
     }
