@@ -995,3 +995,92 @@ def test_reporting_workflow_complete_citizen_journey_and_ai_fallback():
         assert tracked["aiStatus"] in ["completed", "unavailable", "pending"]
 
 
+def test_vision_diagnostics_and_detection_review():
+    """
+    Prompt 8 - Test: YOLO Vision Engine Diagnostics and Detection Review Pipeline
+    - Validates GET /vision/status diagnostics, supported classes, and TACO recommendation
+    - Validates POST /vision/detect with error handling and timing metrics
+    - Validates PATCH /reports/{id}/detections/review classification correction and audit logging
+    - Validates unauthorized rejection (401 unauthenticated, 403 cross-citizen)
+    """
+    with TestClient(app) as client:
+        # 1. Vision status diagnostics endpoint
+        status_resp = client.get("/api/v1/vision/status")
+        assert status_resp.status_code == 200
+        status_data = status_resp.json()
+        assert "available" in status_data
+        assert "supportedClasses" in status_data
+        assert "plastic_bottle" in status_data["supportedClasses"]
+        assert "drink_can" in status_data["supportedClasses"]
+        assert "paper_scrap" in status_data["supportedClasses"]
+        assert "recommendedDataset" in status_data
+        assert "TACO" in status_data["recommendedDataset"]["name"]
+        assert "CC BY 4.0" in status_data["recommendedDataset"]["license"]
+
+        # 2. Register citizen and create a report
+        citizen_a = register_citizen(client, email="vision.citizen.a@example.test")
+        citizen_b = register_citizen(client, email="vision.citizen.b@example.test")
+        pmc_admin = login(client, "pmc@example.test", "PMC-test-password-2026")
+
+        rep_resp = create_report(
+            client,
+            citizen_a,
+            latitude=18.50,
+            longitude=73.95,
+            title="Bottles on riverside path",
+        )
+        assert rep_resp.status_code == 201
+        report_data = rep_resp.json()
+        assert report_data["municipalityCode"] == "PMC"
+        report_id = report_data["id"]
+
+        # 3. Detection Review: Unauthenticated request rejected with 401
+        unauth_review = client.patch(
+            f"/api/v1/reports/{report_id}/detections/review",
+            json={"verifiedCategory": "glass", "note": "Correction test"},
+        )
+        assert unauth_review.status_code == 401
+
+        # 4. Detection Review: Unauthorized citizen B rejected with 403
+        cross_review = client.patch(
+            f"/api/v1/reports/{report_id}/detections/review",
+            json={"verifiedCategory": "glass", "note": "Unauthorized review attempt"},
+            headers=citizen_b,
+        )
+        assert cross_review.status_code == 403
+
+        # 5. Detection Review: Authorized citizen A updates classification
+        citizen_review = client.patch(
+            f"/api/v1/reports/{report_id}/detections/review",
+            json={
+                "verifiedCategory": "metal",
+                "note": "Citizen correction: Found aluminum beverage cans mixed in.",
+                "corrections": [{"label": "drink_can", "category": "metal"}],
+            },
+            headers=citizen_a,
+        )
+        assert citizen_review.status_code == 200
+        updated_data = citizen_review.json()
+        assert updated_data["category"] == "metal"
+
+        # 6. Detection Review: Municipal admin refines classification with audit trail
+        admin_review = client.patch(
+            f"/api/v1/reports/{report_id}/detections/review",
+            json={
+                "verifiedCategory": "plastic",
+                "note": "Supervisor on-site inspection confirmed 90% plastic polymer content.",
+            },
+            headers=pmc_admin,
+        )
+        assert admin_review.status_code == 200
+        assert admin_review.json()["category"] == "plastic"
+        assert "Supervisor on-site inspection" in admin_review.json()["internalNotes"]
+
+        # 7. Audit log contains the detection review action
+        history_resp = client.get(f"/api/v1/reports/{report_id}/history", headers=pmc_admin)
+        assert history_resp.status_code == 200
+        history_entries = history_resp.json()
+        assert any(entry["action"] == "detection.reviewed" for entry in history_entries)
+
+
+

@@ -46,7 +46,7 @@ from .security import (
     user_json,
     verify_password,
 )
-from .vision import detect_objects, detector_status
+from .vision import detect_objects, detector_status, get_vision_engine
 
 
 api = APIRouter(prefix="/api/v1")
@@ -210,6 +210,18 @@ class MunicipalAdminCreate(APIModel):
 class JurisdictionCorrection(APIModel):
     municipality_code: str = Field(min_length=2, max_length=32)
     reason: str = Field(min_length=10, max_length=1000)
+
+
+class DetectionReviewPayload(APIModel):
+    verified_category: Literal["plastic", "glass", "metal", "paper", "hazardous", "organic", "mixed"] | None = None
+    note: str | None = Field(default=None, max_length=1000)
+    corrections: list[dict] = Field(default_factory=list)
+
+
+class DetectionRequest(APIModel):
+    image_url: str | None = None
+    report_id: str | None = None
+    confidence_threshold: float | None = Field(default=None, ge=0.01, le=1.0)
 
 
 def _validate_image_bytes(content: bytes, mime_type: str | None = None) -> str:
@@ -1064,6 +1076,99 @@ def report_history(
         "createdAt": row.created_at.isoformat(),
         "actorName": (db.get(User, row.actor_user_id).name if row.actor_user_id and db.get(User, row.actor_user_id) else None),
     } for row in rows]
+
+
+@api.get("/vision/status")
+def vision_status():
+    """Returns genuine diagnostic state, supported classes, and dataset documentation for the vision engine."""
+    engine = get_vision_engine()
+    return engine.get_diagnostics()
+
+
+@api.post("/vision/detect")
+def run_vision_detect(
+    payload: DetectionRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Executes object detection on a given report image or uploaded image URL.
+    Measures genuine inference latency and extracts normalized bounding boxes.
+    """
+    image_path = None
+    if payload.report_id:
+        report = db.get(Report, payload.report_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found.")
+        if not report.image_url:
+            raise HTTPException(status_code=400, detail="Report does not contain an image.")
+        if report.image_url.startswith("/static/uploads/"):
+            image_path = (UPLOAD_DIR / Path(report.image_url).name).resolve()
+    elif payload.image_url and payload.image_url.startswith("/static/uploads/"):
+        image_path = (UPLOAD_DIR / Path(payload.image_url).name).resolve()
+
+    if not image_path or image_path.parent != UPLOAD_DIR.resolve() or not image_path.is_file():
+        raise HTTPException(status_code=400, detail="A valid uploaded local image path or report ID is required.")
+
+    engine = get_vision_engine()
+    detections, note, metrics = engine.detect(
+        image_path, confidence_threshold=payload.confidence_threshold
+    )
+    return {
+        "detections": detections,
+        "detectionNote": note,
+        "metrics": metrics,
+    }
+
+
+@api.patch("/reports/{report_id}/detections/review")
+def review_report_detections(
+    report_id: str,
+    payload: DetectionReviewPayload,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Enables citizens or municipal administrators to review and correct automated detections.
+    Updates the report's waste classification, records supervisor notes, and writes an audit log.
+    """
+    report = db.get(Report, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found.")
+
+    is_owner = (report.citizen_user_id == user.id) or (report.reporter_id == user.id)
+    is_admin = user.role in ("municipal_admin", "super_admin")
+    if is_admin and user.role == "municipal_admin" and user.municipality_id != report.municipality_id:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if not (is_owner or is_admin):
+        raise HTTPException(status_code=403, detail="Not authorized to review this report's detections.")
+
+    previous_category = report.category
+    if payload.verified_category:
+        report.category = payload.verified_category
+
+    audit_details = {
+        "previousCategory": previous_category,
+        "updatedCategory": report.category,
+        "reviewedBy": user.email,
+        "role": user.role,
+        "corrections": payload.corrections,
+    }
+
+    if payload.note:
+        review_stamp = f"[{utc_now().strftime('%Y-%m-%d %H:%M UTC')} - {user.name} ({user.role})]: {payload.note.strip()}"
+        report.internal_notes = (
+            f"{report.internal_notes}\n{review_stamp}".strip()
+            if report.internal_notes else review_stamp
+        )
+        audit_details["note"] = payload.note
+
+    report.updated_at = utc_now()
+    _audit(db, "detection.reviewed", actor=user, report=report, details=audit_details)
+    db.commit()
+    db.refresh(report)
+
+    return _report_json(report, db, include_contact=is_admin, include_internal_notes=is_admin)
 
 
 @api.delete("/reports/{report_id}", status_code=204)

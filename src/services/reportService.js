@@ -164,4 +164,29 @@ export const reportService = {
   async exportReportsCsv() {
     return await api.get('/reports/export.csv', { responseType: 'text' });
   },
+
+  /**
+   * Retrieves YOLO vision engine status, supported classes, and dataset documentation.
+   */
+  async getVisionStatus() {
+    return await api.get('/vision/status');
+  },
+
+  /**
+   * Runs on-demand object detection on a report or image.
+   */
+  async detectImageObjects(options = {}) {
+    return await api.post('/vision/detect', options);
+  },
+
+  /**
+   * Submits a user or supervisor correction/review for automated detections.
+   */
+  async reviewReportDetections(reportId, reviewPayload) {
+    const response = await api.patch(
+      `/reports/${encodeURIComponent(reportId)}/detections/review`,
+      reviewPayload
+    );
+    return formatReport(response);
+  },
 };

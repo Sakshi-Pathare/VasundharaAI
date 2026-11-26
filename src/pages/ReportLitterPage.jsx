@@ -28,6 +28,7 @@ import { Card, CardHeader, CardBody } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { ImageUploader } from '../components/forms/ImageUploader';
 import { LocationPickerMap } from '../components/map/LocationPickerMap';
+import { DetectionOverlay } from '../components/reporting/DetectionOverlay';
 import { reportService } from '../services/reportService';
 
 export function ReportLitterPage() {
@@ -345,38 +346,48 @@ export function ReportLitterPage() {
                 </div>
               </div>
 
-              {/* Photo & Location Summary */}
-              <div className="flex flex-col sm:flex-row items-start gap-4 p-4 rounded-xl bg-sage-50/70 border border-sage-200">
-                {submittedReport.imageUrl && (
-                  <img
-                    src={submittedReport.imageUrl}
-                    alt="Submitted Evidence"
-                    className="w-28 h-24 object-cover rounded-lg border border-sage-300 shadow-xs shrink-0"
+              {/* Photo & Bounding Box Inspection */}
+              {submittedReport.imageUrl && (
+                <div className="space-y-2">
+                  <DetectionOverlay
+                    imageUrl={submittedReport.imageUrl}
+                    detections={submittedReport.detections}
+                    detectionNote={submittedReport.detectionNote}
+                    aiStatus={submittedReport.aiStatus}
+                    reportId={submittedReport.id}
+                    currentCategory={submittedReport.category}
+                    isEditable={false}
                   />
-                )}
-                <div className="space-y-1 text-xs text-charcoal-800">
-                  <h4 className="font-extrabold text-[#092421] text-sm">
-                    {submittedReport.title}
-                  </h4>
-                  <p className="text-charcoal-600 font-medium">
-                    {submittedReport.address || 'Geo-coordinate location'}
-                  </p>
-                  <p className="font-mono text-[11px] text-[#1B4A45]">
-                    GPS: {submittedReport.latitude?.toFixed(5)}°, {submittedReport.longitude?.toFixed(5)}°
-                  </p>
-                  <div className="flex items-center gap-3 pt-1">
-                    <span className="capitalize font-bold text-[11px]">
-                      Category: {submittedReport.category}
-                    </span>
-                    <span>•</span>
-                    <span className="capitalize font-bold text-[11px]">
-                      Severity: {submittedReport.severity}
-                    </span>
-                    <span>•</span>
-                    <span className="font-bold text-[11px]">
-                      Est: {submittedReport.estimatedKg} kg
-                    </span>
+                </div>
+              )}
+
+              {/* Location & Metadata Summary */}
+              <div className="p-4 rounded-xl bg-sage-50/70 border border-sage-200 text-xs text-charcoal-800 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-extrabold text-[#092421] text-sm">
+                      {submittedReport.title}
+                    </h4>
+                    <p className="text-charcoal-600 font-medium">
+                      {submittedReport.address || 'Geo-coordinate location'}
+                    </p>
                   </div>
+                  <span className="font-mono text-[11px] font-bold text-[#1B4A45] bg-white px-2.5 py-1 rounded-md border border-sage-200">
+                    GPS: {submittedReport.latitude?.toFixed(5)}°, {submittedReport.longitude?.toFixed(5)}°
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 pt-1 text-[11px]">
+                  <span className="capitalize font-bold">
+                    Category: {submittedReport.category}
+                  </span>
+                  <span>•</span>
+                  <span className="capitalize font-bold">
+                    Severity: {submittedReport.severity}
+                  </span>
+                  <span>•</span>
+                  <span className="font-bold">
+                    Est: {submittedReport.estimatedKg} kg
+                  </span>
                 </div>
               </div>
 
