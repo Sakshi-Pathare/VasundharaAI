@@ -27,6 +27,7 @@ function formatReport(raw) {
     zoneId: raw.zoneId,
     estimatedKg: Number(raw.estimatedKg || 1),
     imageUrl: resolveAssetUrl(raw.imageUrl),
+    aiStatus: raw.aiStatus || 'unavailable',
     detectionNote: raw.detectionNote || '',
     detections: raw.detections || [],
     internalNotes: raw.internalNotes || '',
@@ -111,6 +112,16 @@ export const reportService = {
 
     const response = await api.post('/reports', payload);
     return formatReport(response);
+  },
+
+  /**
+   * Uploads an image file via multipart/form-data.
+   * Supports JPEG, PNG, WebP with server-side validation and content-hash deduplication.
+   */
+  async uploadImage(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return await api.post('/uploads', formData);
   },
 
   /**

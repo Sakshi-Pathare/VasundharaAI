@@ -90,8 +90,12 @@ export function LoginPage() {
         setError('Please enter your full name.');
         return;
       }
-      if (formData.password.length < 8) {
-        setError('Password must be at least 8 characters long.');
+      if (formData.password.length < 12) {
+        setError('Password must be at least 12 characters long.');
+        return;
+      }
+      if (!/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
+        setError('Password must contain at least one letter and at least one number.');
         return;
       }
       if (formData.password !== formData.confirmPassword) {

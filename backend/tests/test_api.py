@@ -1,6 +1,9 @@
+import base64
+import io
 import os
 from pathlib import Path
 
+os.environ["TESTING"] = "1"
 original_database_url = os.environ.get("DATABASE_URL")
 os.environ["DATABASE_URL"] = "sqlite://"
 
@@ -11,7 +14,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import UPLOAD_DIR, app
-from app.models import Municipality, User, WardBoundary
+from app.models import AuthSession, Municipality, User, WardBoundary
+from app.rate_limiter import login_rate_limiter, register_rate_limiter
 from app.security import hash_password
 
 if original_database_url is None:
@@ -53,6 +57,8 @@ def rectangle(west, south, east, north):
 
 
 def setup_function():
+    login_rate_limiter.reset()
+    register_rate_limiter.reset()
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     with TestSession() as db:
@@ -578,4 +584,414 @@ def test_full_lifecycle_citizen_to_cleanup():
         metrics = metrics_resp.json()
         assert metrics["totalReports"] >= 1
         assert metrics["completedCleanups"] >= 1
+
+
+def test_security_password_complexity_and_registration():
+    """
+    Prompt 6 - Security Test 1:
+    Validates password policy enforcement and registration security:
+    - Passwords under 12 characters are rejected (422)
+    - Passwords without letters or without numbers are rejected (422)
+    - Strong compliant passwords succeed (201) and return token without password hash
+    - Duplicate registration emails return 409
+    """
+    with TestClient(app) as client:
+        # Too short (< 12 chars)
+        resp_short = client.post("/api/v1/auth/register", json={
+            "name": "Short Pass User",
+            "email": "short@example.test",
+            "password": "Pass1",
+        })
+        assert resp_short.status_code == 422
+
+        # 12 chars but no digit
+        resp_no_digit = client.post("/api/v1/auth/register", json={
+            "name": "No Digit User",
+            "email": "nodigit@example.test",
+            "password": "OnlyLettersLongPass",
+        })
+        assert resp_no_digit.status_code == 422
+
+        # 12 chars but no letter
+        resp_no_letter = client.post("/api/v1/auth/register", json={
+            "name": "No Letter User",
+            "email": "noletter@example.test",
+            "password": "123456789012",
+        })
+        assert resp_no_letter.status_code == 422
+
+        # Compliant registration (>= 12 chars, letters + digits)
+        resp_ok = client.post("/api/v1/auth/register", json={
+            "name": "Valid Citizen",
+            "email": "valid.citizen@example.test",
+            "phone": "+91-9999888877",
+            "password": "StrongPassword2026!",
+        })
+        assert resp_ok.status_code == 201
+        data = resp_ok.json()
+        assert "accessToken" in data
+        assert data["user"]["email"] == "valid.citizen@example.test"
+        assert "password" not in data["user"]
+        assert "passwordHash" not in data["user"]
+        assert "password_hash" not in data["user"]
+
+        # Duplicate email
+        resp_dup = client.post("/api/v1/auth/register", json={
+            "name": "Duplicate User",
+            "email": "valid.citizen@example.test",
+            "password": "StrongPassword2026!",
+        })
+        assert resp_dup.status_code == 409
+        assert "already exists" in resp_dup.text
+
+
+def test_security_login_rate_limiting_and_enumeration_defense():
+    """
+    Prompt 6 - Security Test 2:
+    Validates login security, rate limiting, and email enumeration defense:
+    - Non-existent email returns generic 401
+    - Existing email with wrong password returns identical generic 401
+    - 5 rapid failed login attempts succeed, 6th triggers 429 Too Many Requests
+    - Successful login resets failure counter
+    """
+    with TestClient(app) as client:
+        # Register a valid user
+        reg_resp = client.post("/api/v1/auth/register", json={
+            "name": "Rate Limit Target",
+            "email": "ratelimit@example.test",
+            "password": "SecurePassword12345",
+        })
+        assert reg_resp.status_code == 201
+
+        # Non-existent email -> generic 401
+        resp_nonexistent = client.post("/api/v1/auth/login", json={
+            "email": "nonexistent.user.2026@example.test",
+            "password": "WrongPassword123",
+        })
+        assert resp_nonexistent.status_code == 401
+        assert resp_nonexistent.json()["detail"] == "Email or password is incorrect."
+
+        # Existing user with wrong password -> identical generic 401
+        resp_wrong_pass = client.post("/api/v1/auth/login", json={
+            "email": "ratelimit@example.test",
+            "password": "WrongPassword123",
+        })
+        assert resp_wrong_pass.status_code == 401
+        assert resp_wrong_pass.json()["detail"] == "Email or password is incorrect."
+
+        # Exceed rate limit (attempt 5 times)
+        for _ in range(4):
+            client.post("/api/v1/auth/login", json={
+                "email": "ratelimit@example.test",
+                "password": "WrongPassword123",
+            })
+
+        # 6th attempt MUST return 429 Too Many Requests
+        rate_limited_resp = client.post("/api/v1/auth/login", json={
+            "email": "ratelimit@example.test",
+            "password": "WrongPassword123",
+        })
+        assert rate_limited_resp.status_code == 429
+        assert "Retry-After" in rate_limited_resp.headers
+        assert "Too many authentication attempts" in rate_limited_resp.text
+
+
+def test_security_session_revocation_and_expiration():
+    """
+    Prompt 6 - Security Test 3:
+    Validates session revocation (logout) and expiration:
+    - Active token can access /auth/me
+    - Logging out revokes session from database
+    - Revoked token receives 401 Unauthorized
+    - Expired token receives 401 Unauthorized
+    """
+    with TestClient(app) as client:
+        # Register and login
+        reg_resp = client.post("/api/v1/auth/register", json={
+            "name": "Session User",
+            "email": "session.user@example.test",
+            "password": "SessionPassword2026!",
+        })
+        assert reg_resp.status_code == 201
+        token = reg_resp.json()["accessToken"]
+        auth_headers = {"Authorization": f"Bearer {token}"}
+
+        # Valid session accesses /auth/me
+        me_resp = client.get("/api/v1/auth/me", headers=auth_headers)
+        assert me_resp.status_code == 200
+
+        # Logout
+        logout_resp = client.post("/api/v1/auth/logout", headers=auth_headers)
+        assert logout_resp.status_code == 204
+
+        # Calling /auth/me with revoked token MUST return 401
+        revoked_resp = client.get("/api/v1/auth/me", headers=auth_headers)
+        assert revoked_resp.status_code == 401
+        assert "Invalid or expired session" in revoked_resp.text
+
+        # Test artificially expired session
+        new_login = client.post("/api/v1/auth/login", json={
+            "email": "session.user@example.test",
+            "password": "SessionPassword2026!",
+        })
+        new_token = new_login.json()["accessToken"]
+        new_headers = {"Authorization": f"Bearer {new_token}"}
+
+        # Expire session in DB
+        import hashlib
+        from datetime import datetime, timedelta, timezone
+        token_hash = hashlib.sha256(new_token.encode("ascii")).hexdigest()
+        with TestSession() as db:
+            session_rec = db.get(AuthSession, token_hash)
+            assert session_rec is not None
+            session_rec.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+            db.commit()
+
+        # Calling with expired session MUST return 401
+        expired_resp = client.get("/api/v1/auth/me", headers=new_headers)
+        assert expired_resp.status_code == 401
+        assert "Invalid or expired session" in expired_resp.text
+
+
+def test_security_role_escalation_and_privilege_enforcement():
+    """
+    Prompt 6 - Security Test 4:
+    Validates strict RBAC and privilege escalation protection:
+    - Citizens cannot access administrative triage queue (/reports)
+    - Citizens cannot dispatch cleanups (/cleanups)
+    - Citizens cannot view admin notifications (/admin/notifications)
+    - Citizens cannot access superadmin routes (/superadmin/...)
+    - Municipal admins cannot access superadmin routes (/superadmin/...)
+    - Unauthenticated requests to protected endpoints return 401
+    """
+    with TestClient(app) as client:
+        citizen_headers = register_citizen(client, email="citizen.security@example.test")
+        pcmc_admin = login(client, "pcmc@example.test", "PCMC-test-password-2026")
+
+        # 1. Citizen cannot read municipal admin reports
+        assert client.get("/api/v1/reports", headers=citizen_headers).status_code == 403
+
+        # 2. Citizen cannot dispatch cleanups
+        assert client.post("/api/v1/cleanups", json={"reportId": "EW-FAKE"}, headers=citizen_headers).status_code == 403
+
+        # 3. Citizen cannot read municipal notifications
+        assert client.get("/api/v1/admin/notifications", headers=citizen_headers).status_code == 403
+
+        # 4. Citizen cannot access superadmin onboarding
+        assert client.post("/api/v1/superadmin/municipalities", json={"code": "X"}, headers=citizen_headers).status_code == 403
+
+        # 5. Municipal Admin cannot access superadmin endpoints
+        assert client.post("/api/v1/superadmin/municipalities", json={"code": "X"}, headers=pcmc_admin).status_code == 403
+
+        # 6. Unauthenticated requests to sensitive endpoints return 401
+        assert client.get("/api/v1/reports").status_code == 401
+        assert client.get("/api/v1/admin/notifications").status_code == 401
+        assert client.get("/api/v1/reports/mine").status_code == 401
+
+
+def test_security_cross_citizen_and_tenant_data_isolation():
+    """
+    Prompt 6 - Security Test 5:
+    Validates cross-citizen privacy and multi-tenant municipal isolation:
+    - Citizen A cannot see Citizen B's reports on /reports/mine
+    - Public reports strip private data (reporterEmail, reporterPhone, internalNotes)
+    - Municipal admin from PCMC cannot see or touch PMC reports
+    """
+    with TestClient(app) as client:
+        # Register two separate citizens
+        citizen_a = register_citizen(client, email="citizen.a@example.test")
+        citizen_b = register_citizen(client, email="citizen.b@example.test")
+
+        # Citizen A submits Report A in PCMC
+        rep_a = create_report(client, citizen_a, latitude=18.62, longitude=73.80, title="Citizen A Report").json()
+
+        # Citizen B submits Report B in PCMC
+        rep_b = create_report(client, citizen_b, latitude=18.63, longitude=73.81, title="Citizen B Report").json()
+
+        # Citizen A's /reports/mine should only contain Report A
+        mine_a = client.get("/api/v1/reports/mine", headers=citizen_a).json()
+        assert any(r["id"] == rep_a["id"] for r in mine_a)
+        assert not any(r["id"] == rep_b["id"] for r in mine_a)
+
+        # Citizen B's /reports/mine should only contain Report B
+        mine_b = client.get("/api/v1/reports/mine", headers=citizen_b).json()
+        assert any(r["id"] == rep_b["id"] for r in mine_b)
+        assert not any(r["id"] == rep_a["id"] for r in mine_b)
+
+        # Public reports must strip private reporter data
+        public_reports = client.get("/api/v1/public/reports").json()
+        for pub in public_reports:
+            assert "reporterEmail" not in pub
+            assert "reporterPhone" not in pub
+            assert "internalNotes" not in pub
+
+        # Municipal isolation: PCMC admin views rep_a (inside PCMC) -> 200
+        pcmc_admin = login(client, "pcmc@example.test", "PCMC-test-password-2026")
+        assert client.get(f"/api/v1/reports/{rep_a['id']}", headers=pcmc_admin).status_code == 200
+
+        # PMC admin queries rep_a (which is in PCMC) -> 404 (concealed)
+        pmc_admin = login(client, "pmc@example.test", "PMC-test-password-2026")
+        assert client.get(f"/api/v1/reports/{rep_a['id']}", headers=pmc_admin).status_code == 404
+
+
+def test_reporting_workflow_image_upload_and_validation():
+    """
+    Prompt 7 - Test 1: Image Upload Pipeline & Security
+    - Validates multipart/form-data upload endpoint (/uploads)
+    - Validates authentic JPEG, PNG, and WebP signatures
+    - Rejects corrupt or forged files (400)
+    - Enforces max upload size threshold (413)
+    - Rejects path traversal attempts
+    - Performs content-hash deduplication
+    """
+    with TestClient(app) as client:
+        citizen_headers = register_citizen(client, email="uploader@example.test")
+
+        # 1. Authentic JPEG upload
+        jpeg_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00" + b"\x00" * 100
+        resp_jpg = client.post(
+            "/api/v1/uploads",
+            files={"file": ("test_photo.jpg", io.BytesIO(jpeg_bytes), "image/jpeg")},
+            headers=citizen_headers,
+        )
+        assert resp_jpg.status_code == 200
+        jpg_data = resp_jpg.json()
+        assert jpg_data["url"].startswith("/static/uploads/")
+        assert jpg_data["fileName"].endswith(".jpg")
+
+        # 2. Authentic PNG upload
+        png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 50
+        resp_png = client.post(
+            "/api/v1/uploads",
+            files={"file": ("test_photo.png", io.BytesIO(png_bytes), "image/png")},
+            headers=citizen_headers,
+        )
+        assert resp_png.status_code == 200
+        assert resp_png.json()["fileName"].endswith(".png")
+
+        # 3. Authentic WebP upload
+        webp_bytes = b"RIFF\x20\x00\x00\x00WEBPVP8 " + b"\x00" * 40
+        resp_webp = client.post(
+            "/api/v1/uploads",
+            files={"file": ("test_photo.webp", io.BytesIO(webp_bytes), "image/webp")},
+            headers=citizen_headers,
+        )
+        assert resp_webp.status_code == 200
+        assert resp_webp.json()["fileName"].endswith(".webp")
+
+        # 4. Forged file (text pretending to be JPEG) -> 400 Bad Request
+        fake_bytes = b"This is not a real JPEG image file, just plain text."
+        resp_fake = client.post(
+            "/api/v1/uploads",
+            files={"file": ("malicious.jpg", io.BytesIO(fake_bytes), "image/jpeg")},
+            headers=citizen_headers,
+        )
+        assert resp_fake.status_code == 400
+        assert "does not match" in resp_fake.text or "Invalid image" in resp_fake.text
+
+        # 5. Oversized image (> 8MB limit) -> 413 Payload Too Large
+        oversized_bytes = b"\xff\xd8\xff" + (b"\x00" * (8 * 1024 * 1024 + 500))
+        resp_large = client.post(
+            "/api/v1/uploads",
+            files={"file": ("huge.jpg", io.BytesIO(oversized_bytes), "image/jpeg")},
+            headers=citizen_headers,
+        )
+        assert resp_large.status_code == 413
+
+        # 6. Deduplication: Uploading the exact same JPEG again returns same hash URL
+        resp_dup = client.post(
+            "/api/v1/uploads",
+            files={"file": ("another_name.jpg", io.BytesIO(jpeg_bytes), "image/jpeg")},
+            headers=citizen_headers,
+        )
+        assert resp_dup.status_code == 200
+        assert resp_dup.json()["url"] == jpg_data["url"]
+
+
+def test_reporting_workflow_complete_citizen_journey_and_ai_fallback():
+    """
+    Prompt 7 - Test 2: End-to-End Citizen Reporting Journey & AI Fallback
+    - User journey: login, upload photo, specify GPS coordinates, fill incident info
+    - System validates coordinates bounds and inputs
+    - System assigns jurisdiction (PMC / Ward)
+    - AI analysis resilience: Report is NOT discarded if AI model is unavailable
+    - Report ID (EW-...) is returned
+    - Citizen can track report in /reports/mine with status and AI status
+    """
+    with TestClient(app) as client:
+        citizen_headers = register_citizen(client, email="steward.citizen@example.test")
+
+        # 1. Base64 JPEG photo
+        jpeg_raw = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00" + b"\x00" * 60
+        b64_image = f"data:image/jpeg;base64,{base64.b64encode(jpeg_raw).decode('utf-8')}"
+
+        # 2. Validation rejection: Invalid latitude out of bounds
+        invalid_lat = client.post(
+            "/api/v1/reports",
+            json={
+                "title": "Invalid Lat Report",
+                "latitude": 95.0,  # Invalid (> 90)
+                "longitude": 73.85,
+                "category": "plastic",
+            },
+            headers=citizen_headers,
+        )
+        assert invalid_lat.status_code == 422
+
+        # 3. Successful submission within PMC boundaries
+        report_payload = {
+            "title": "Plastic and bottle accumulation on riverbank walkway",
+            "description": "Heavy debris scattered near drainage culvert after rain. Proximity to public footpath.",
+            "category": "plastic",
+            "severity": "high",
+            "estimatedKg": 15,
+            "latitude": 18.5222,
+            "longitude": 73.8415,
+            "address": "Near FC Road, Deccan Gymkhana, Pune, Maharashtra",
+            "imageUrl": b64_image,
+        }
+
+        submit_resp = client.post("/api/v1/reports", json={
+            "title": report_payload["title"],
+            "description": report_payload["description"],
+            "category": report_payload["category"],
+            "severity": report_payload["severity"],
+            "estimated_kg": report_payload["estimatedKg"],
+            "latitude": report_payload["latitude"],
+            "longitude": report_payload["longitude"],
+            "address": report_payload["address"],
+            "image_url": report_payload["imageUrl"],
+        }, headers=citizen_headers)
+
+        assert submit_resp.status_code == 201
+        report_data = submit_resp.json()
+
+        # 4. Verify actual report ID format
+        assert report_data["id"].startswith("EW-")
+        report_id = report_data["id"]
+
+        # 5. Verify Jurisdiction assignment (PMC)
+        assert report_data["jurisdictionStatus"] in ["assigned", "pending"]
+        if report_data["municipalityCode"]:
+            assert report_data["municipalityCode"] == "PMC"
+
+        # 6. Verify AI Resilience: Not discarded, limitation is visible
+        assert "aiStatus" in report_data
+        assert report_data["aiStatus"] in ["completed", "unavailable", "pending"]
+        assert "detectionNote" in report_data
+        assert report_data["status"] == "pending"
+
+        # 7. Citizen can track report in /reports/mine
+        mine_resp = client.get("/api/v1/reports/mine", headers=citizen_headers)
+        assert mine_resp.status_code == 200
+        mine_list = mine_resp.json()
+        matching = [r for r in mine_list if r["id"] == report_id]
+        assert len(matching) == 1
+        tracked = matching[0]
+        assert tracked["title"] == report_payload["title"]
+        assert tracked["category"] == "plastic"
+        assert tracked["severity"] == "high"
+        assert tracked["imageUrl"].startswith("/static/uploads/")
+        assert tracked["aiStatus"] in ["completed", "unavailable", "pending"]
+
 

@@ -1,9 +1,11 @@
 import base64
 import binascii
 import csv
+import hashlib
 import io
 import math
 import os
+import re
 import secrets
 import uuid
 from collections import Counter
@@ -11,13 +13,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
+from .config import logger, settings
 from .database import BACKEND_DIR, get_db
 from .jurisdiction import geometry_boundary_distance_meters, geometry_contains, resolve_jurisdiction
 from .models import (
@@ -31,7 +34,9 @@ from .models import (
     WardBoundary,
     utc_now,
 )
+from .rate_limiter import login_rate_limiter, register_rate_limiter
 from .security import (
+    DUMMY_HASH,
     get_current_user,
     hash_password,
     issue_session,
@@ -47,8 +52,13 @@ from .vision import detect_objects, detector_status
 api = APIRouter(prefix="/api/v1")
 UPLOAD_DIR = BACKEND_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_IMAGE_BYTES = 8 * 1024 * 1024
-ALLOWED_IMAGE_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+MAX_IMAGE_BYTES = getattr(settings, "max_image_bytes", 8 * 1024 * 1024)
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
 ADMIN_PERMISSIONS = {
     "reports:read",
     "reports:manage",
@@ -91,6 +101,17 @@ class RegisterPayload(APIModel):
         if normalized.count("@") != 1 or "." not in normalized.rsplit("@", 1)[-1]:
             raise ValueError("Enter a valid email address.")
         return normalized
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, value: str) -> str:
+        if len(value) < 12:
+            raise ValueError("Password must be at least 12 characters long.")
+        if not re.search(r"[A-Za-z]", value):
+            raise ValueError("Password must contain at least one letter.")
+        if not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one digit.")
+        return value
 
 
 class LoginPayload(APIModel):
@@ -174,39 +195,81 @@ class MunicipalAdminCreate(APIModel):
             raise ValueError("Enter a valid email address.")
         return normalized
 
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, value: str) -> str:
+        if len(value) < 12:
+            raise ValueError("Password must be at least 12 characters long.")
+        if not re.search(r"[A-Za-z]", value):
+            raise ValueError("Password must contain at least one letter.")
+        if not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one digit.")
+        return value
+
 
 class JurisdictionCorrection(APIModel):
     municipality_code: str = Field(min_length=2, max_length=32)
     reason: str = Field(min_length=10, max_length=1000)
 
 
+def _validate_image_bytes(content: bytes, mime_type: str | None = None) -> str:
+    if not content:
+        raise HTTPException(status_code=400, detail="The uploaded image file is empty.")
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image exceeds maximum permitted size of {MAX_IMAGE_BYTES // (1024 * 1024)} MB."
+        )
+
+    # Magic byte signature verification
+    is_jpeg = content.startswith(b"\xff\xd8\xff")
+    is_png = content.startswith(b"\x89PNG\r\n\x1a\n")
+    is_webp = content.startswith(b"RIFF") and len(content) >= 12 and content[8:12] == b"WEBP"
+
+    if is_jpeg:
+        return ".jpg"
+    elif is_png:
+        return ".png"
+    elif is_webp:
+        return ".webp"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file content does not match allowed image types (JPEG, PNG, WebP)."
+        )
+
+
 def _image_url(value: str | None, key: str) -> str | None:
-    if not value or not value.startswith("data:"):
+    if not value:
+        return None
+    if value.startswith("/static/uploads/"):
+        clean_name = Path(value).name
+        target = (UPLOAD_DIR / clean_name).resolve()
+        if target.parent != UPLOAD_DIR.resolve():
+            raise HTTPException(status_code=400, detail="Path traversal detected in image reference.")
+        return f"/static/uploads/{clean_name}"
+    if not value.startswith("data:"):
         return value
+
     try:
         header, encoded = value.split(",", 1)
         mime_type = header[5:].split(";", 1)[0].lower()
-        extension = ALLOWED_IMAGE_TYPES.get(mime_type)
-        if not extension or ";base64" not in header:
-            raise HTTPException(status_code=400, detail="Only JPEG, PNG, and WebP image uploads are supported.")
+        if ";base64" not in header:
+            raise HTTPException(status_code=400, detail="Only Base64-encoded image uploads are supported.")
         content = base64.b64decode(encoded, validate=True)
     except (ValueError, binascii.Error) as exc:
         raise HTTPException(status_code=400, detail="The uploaded image is not valid base64 data.") from exc
 
-    if not content:
-        return None
-    if len(content) > MAX_IMAGE_BYTES:
-        raise HTTPException(status_code=413, detail="Compressed images must be 8 MB or smaller.")
-    valid_signature = (
-        (mime_type == "image/jpeg" and content.startswith(b"\xff\xd8\xff"))
-        or (mime_type == "image/png" and content.startswith(b"\x89PNG\r\n\x1a\n"))
-        or (mime_type == "image/webp" and content.startswith(b"RIFF") and content[8:12] == b"WEBP")
-    )
-    if not valid_signature:
-        raise HTTPException(status_code=400, detail="The uploaded file content does not match its image type.")
+    extension = _validate_image_bytes(content, mime_type)
 
-    file_name = f"{key}-{uuid.uuid4().hex}{extension}"
-    (UPLOAD_DIR / file_name).write_bytes(content)
+    # Deduplicate via cryptographic content hash
+    content_hash = hashlib.sha256(content).hexdigest()
+    file_name = f"{key}-{content_hash[:16]}{extension}"
+    target = (UPLOAD_DIR / file_name).resolve()
+    if target.parent != UPLOAD_DIR.resolve():
+        raise HTTPException(status_code=400, detail="Invalid destination path.")
+    if not target.exists():
+        target.write_bytes(content)
     return f"/static/uploads/{file_name}"
 
 
@@ -218,6 +281,31 @@ def _remove_local_image(url: str | None) -> None:
         target.unlink()
 
 
+@api.post("/uploads")
+def upload_image(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    try:
+        content = file.file.read()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {exc}") from exc
+
+    extension = _validate_image_bytes(content, file.content_type)
+    content_hash = hashlib.sha256(content).hexdigest()
+    file_name = f"up-{content_hash[:20]}{extension}"
+    target = (UPLOAD_DIR / file_name).resolve()
+    if target.parent != UPLOAD_DIR.resolve():
+        raise HTTPException(status_code=400, detail="Invalid destination path.")
+    if not target.exists():
+        target.write_bytes(content)
+    return {
+        "url": f"/static/uploads/{file_name}",
+        "fileName": file_name,
+        "size": len(content),
+    }
+
+
 def _municipality_json(municipality: Municipality) -> dict:
     return {
         "id": municipality.id,
@@ -227,6 +315,19 @@ def _municipality_json(municipality: Municipality) -> dict:
         "boundaryAvailable": bool(municipality.boundary_geojson),
         "active": municipality.active,
     }
+
+
+def _compute_ai_status(report: Report) -> str:
+    note = (report.detection_note or "").lower()
+    if not report.image_url:
+        return "not_applicable"
+    if "temporarily unavailable" in note or "not configured" in note or "limitation" in note:
+        return "unavailable"
+    if "pending" in note:
+        return "pending"
+    if report.detections or "yolo" in note or "detected" in note:
+        return "completed"
+    return "completed" if report.detection_note else "unavailable"
 
 
 def _report_json(
@@ -260,6 +361,7 @@ def _report_json(
         ),
         "estimatedKg": report.estimated_kg,
         "imageUrl": report.image_url,
+        "aiStatus": _compute_ai_status(report),
         "detectionNote": report.detection_note,
         "detections": report.detections or [],
         "reportedAt": report.reported_at.isoformat() if report.reported_at else None,
@@ -581,7 +683,17 @@ def ai_status():
 
 
 @api.post("/auth/register", status_code=201)
-def register(payload: RegisterPayload, db: Session = Depends(get_db)):
+def register(request: Request, payload: RegisterPayload, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    rate_key = f"register:{client_ip}"
+    allowed, retry_after = register_rate_limiter.check(rate_key)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many registration attempts. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     if db.scalar(select(User.id).where(User.email == payload.email)):
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
     user = User(
@@ -601,10 +713,31 @@ def register(payload: RegisterPayload, db: Session = Depends(get_db)):
 
 
 @api.post("/auth/login")
-def login(payload: LoginPayload, db: Session = Depends(get_db)):
+def login(request: Request, payload: LoginPayload, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    rate_key = f"login:{client_ip}:{payload.email}"
+    allowed, retry_after = login_rate_limiter.check(rate_key)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication attempts. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     user = db.scalar(select(User).where(User.email == payload.email))
-    if not user or not user.active or not verify_password(payload.password, user.password_hash):
+    valid_password = False
+    if user and user.password_hash:
+        valid_password = verify_password(payload.password, user.password_hash)
+    else:
+        # Constant-time dummy verification to protect against email enumeration timing attacks
+        verify_password(payload.password, DUMMY_HASH)
+
+    if not user or not user.active or not valid_password:
         raise HTTPException(status_code=401, detail="Email or password is incorrect.")
+
+    # Successful login: reset failed counter for this key
+    login_rate_limiter.reset(rate_key)
+
     municipality = db.get(Municipality, user.municipality_id) if user.municipality_id else None
     token, expires_at = issue_session(db, user)
     db.commit()
@@ -700,11 +833,15 @@ def create_report(
     detections = []
     detection_note = "AI detector not configured; report classification is user-provided."
     if image_url and image_url.startswith("/static/uploads/"):
-        try:
-            detections, detection_note = detect_objects(UPLOAD_DIR / Path(image_url).name)
-        except RuntimeError as exc:
-            _remove_local_image(image_url)
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        img_name = Path(image_url).name
+        target = (UPLOAD_DIR / img_name).resolve()
+        if target.parent == UPLOAD_DIR.resolve() and target.is_file():
+            try:
+                detections, detection_note = detect_objects(target)
+            except Exception as exc:
+                logger.warning(f"AI detection unavailable or failed for report {report_id}: {exc}")
+                detections = []
+                detection_note = f"AI analysis temporarily unavailable ({exc}). Report preserved with user classification."
 
     jurisdiction = resolve_jurisdiction(db, payload.latitude, payload.longitude)
     municipality = jurisdiction["municipality"]

@@ -43,6 +43,10 @@ def hash_password(password: str) -> str:
     )
 
 
+# Pre-computed dummy hash to prevent email enumeration timing attacks
+DUMMY_HASH = hash_password("dummy-password-for-constant-time-verification")
+
+
 def verify_password(password: str, encoded: str) -> bool:
     try:
         algorithm, rounds_text, salt_text, expected = encoded.split("$", 3)

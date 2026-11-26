@@ -34,15 +34,16 @@ export function LocationPickerMap({
   const [geoSuccess, setGeoSuccess] = useState(false);
   const [flyTarget, setFlyTarget] = useState(null);
 
-  const currentLat = latitude || 18.5204;
-  const currentLng = longitude || 73.8567;
+  const hasLocation =
+    latitude !== null &&
+    latitude !== undefined &&
+    longitude !== null &&
+    longitude !== undefined &&
+    !isNaN(latitude) &&
+    !isNaN(longitude);
 
-  // Auto-detect current real-time GPS location on mount
-  useEffect(() => {
-    if (navigator.geolocation && (!latitude || latitude === 37.7749 || latitude === 18.5204)) {
-      handleGetCurrentLocation();
-    }
-  }, []);
+  const centerLat = hasLocation ? latitude : 18.5204;
+  const centerLng = hasLocation ? longitude : 73.8567;
 
   const handleLocationSelect = (lat, lng) => {
     onChange(Number(lat.toFixed(6)), Number(lng.toFixed(6)));
@@ -69,13 +70,13 @@ export function LocationPickerMap({
       },
       (err) => {
         setGeoLoading(false);
-        let errorMsg = 'Could not retrieve GPS coordinates. Please select manually on the map.';
-        if (err.code === 1) { // PERMISSION_DENIED
-          errorMsg = 'Location permission was denied. Please allow location access in your browser or click on the map to set your report location.';
-        } else if (err.code === 2) { // POSITION_UNAVAILABLE
-          errorMsg = 'GPS signal unavailable. Please ensure location services are enabled or click directly on the map.';
-        } else if (err.code === 3) { // TIMEOUT
-          errorMsg = 'GPS location request timed out. Please try again or click directly on the map.';
+        let errorMsg = 'Could not retrieve GPS coordinates. Please click on the map to set location.';
+        if (err.code === 1) {
+          errorMsg = 'Location permission was denied. Please click directly on the interactive map to set your report location.';
+        } else if (err.code === 2) {
+          errorMsg = 'GPS signal unavailable. Please click directly on the map.';
+        } else if (err.code === 3) {
+          errorMsg = 'GPS request timed out. Please click directly on the map to place your pin.';
         }
         setGeoError(errorMsg);
       },
@@ -89,8 +90,8 @@ export function LocationPickerMap({
     <div className="space-y-2">
       <div className="relative rounded-xl overflow-hidden border border-sage-300 shadow-inner" style={{ height }}>
         <MapContainer
-          center={[currentLat, currentLng]}
-          zoom={14}
+          center={[centerLat, centerLng]}
+          zoom={hasLocation ? 15 : 13}
           scrollWheelZoom={true}
           style={{ height: '100%', width: '100%' }}
         >
@@ -102,18 +103,20 @@ export function LocationPickerMap({
           <MapClickHandler onLocationSelect={handleLocationSelect} />
           <MapPanController target={flyTarget} />
 
-          <Marker
-            position={[currentLat, currentLng]}
-            icon={pickerIcon}
-            draggable={true}
-            eventHandlers={{
-              dragend(e) {
-                const marker = e.target;
-                const position = marker.getLatLng();
-                handleLocationSelect(position.lat, position.lng);
-              },
-            }}
-          />
+          {hasLocation && (
+            <Marker
+              position={[latitude, longitude]}
+              icon={pickerIcon}
+              draggable={true}
+              eventHandlers={{
+                dragend(e) {
+                  const marker = e.target;
+                  const position = marker.getLatLng();
+                  handleLocationSelect(position.lat, position.lng);
+                },
+              }}
+            />
+          )}
         </MapContainer>
 
         {/* Floating Geo Button */}
@@ -131,7 +134,7 @@ export function LocationPickerMap({
             icon={Navigation}
             loading={geoLoading}
             onClick={handleGetCurrentLocation}
-            className="shadow-md text-xs py-1.5 px-3.5 rounded-full font-black"
+            className="shadow-md text-xs py-1.5 px-3.5 rounded-full font-black hover:scale-105 active:scale-95 transition-all"
           >
             Locate Me
           </Button>
@@ -139,18 +142,26 @@ export function LocationPickerMap({
 
         {/* Instructions banner */}
         <div className="absolute bottom-3 left-3 right-3 z-[1000] bg-[#092421]/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-[#74D7CB]/30 text-xs text-white flex items-center justify-between shadow-soft">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-[#74D7CB]" />
-            <span className="text-white text-[11px]">Click or drag pin to adjust location</span>
+          <div className="flex items-center gap-1.5 truncate">
+            <MapPin className="w-3.5 h-3.5 text-[#74D7CB] shrink-0" />
+            {hasLocation ? (
+              <span className="text-white text-[11px] truncate">
+                Pin placed. Drag pin or click map to correct location.
+              </span>
+            ) : (
+              <span className="text-amber-300 font-bold text-[11px] truncate">
+                Click map or tap 'Locate Me' to pin location
+              </span>
+            )}
           </div>
-          <span className="font-mono text-[11px] font-bold text-[#74D7CB]">
-            {currentLat.toFixed(4)}°, {currentLng.toFixed(4)}°
+          <span className="font-mono text-[11px] font-bold text-[#74D7CB] shrink-0 ml-2">
+            {hasLocation ? `${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°` : 'No Pin Set'}
           </span>
         </div>
       </div>
 
       {geoError && (
-        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 text-rose-700 text-xs border border-rose-200">
+        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 text-rose-700 text-xs border border-rose-200 animate-fadeIn">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{geoError}</span>
         </div>

@@ -14,6 +14,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { SuperAdminPage } from './pages/SuperAdminPage';
 import { HotspotIntelligencePage } from './pages/HotspotIntelligencePage';
 import { CleanupManagementPage } from './pages/CleanupManagementPage';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 export default function App() {
   return (
@@ -29,14 +30,63 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/app" element={<AppPortalPage />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/dashboard" element={<UserDashboard />} />
-            <Route path="/report" element={<ReportLitterPage />} />
             <Route path="/map" element={<PollutionMapPage />} />
-            <Route path="/my-reports" element={<MyReportsPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/superadmin" element={<SuperAdminPage />} />
             <Route path="/hotspots" element={<HotspotIntelligencePage />} />
-            <Route path="/cleanups" element={<CleanupManagementPage />} />
+
+            {/* Authenticated Citizen & User Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <UserDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/report"
+              element={
+                <ProtectedRoute>
+                  <ReportLitterPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-reports"
+              element={
+                <ProtectedRoute>
+                  <MyReportsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Municipal Administrator Routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['municipal_admin', 'super_admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cleanups"
+              element={
+                <ProtectedRoute allowedRoles={['municipal_admin', 'super_admin']}>
+                  <CleanupManagementPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Super Administrator Routes */}
+            <Route
+              path="/superadmin"
+              element={
+                <ProtectedRoute allowedRoles={['super_admin']}>
+                  <SuperAdminPage />
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

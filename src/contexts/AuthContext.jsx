@@ -19,14 +19,6 @@ export function AuthProvider({ children }) {
 
         if (activeUser) {
           setUser(activeUser);
-        } else if (import.meta.env.DEV) {
-          // In local dev, initialize with demo citizen token for seamless evaluation
-          try {
-            const demoUser = await authService.loginDemo('citizen');
-            if (mounted) setUser(demoUser);
-          } catch {
-            if (mounted) setUser(null);
-          }
         } else {
           setUser(null);
         }

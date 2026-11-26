@@ -17,6 +17,10 @@ from .vision import detector_status
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if os.getenv("TESTING") == "1":
+        yield
+        return
+
     logger.info(f"Starting Vasundhara AI API [Environment: {settings.environment}]")
     logger.info(f"Database dialect: {engine.dialect.name} | URL: {settings.database_url.split('@')[-1]}")
     logger.info(f"Upload directory configured at: {UPLOAD_DIR}")
