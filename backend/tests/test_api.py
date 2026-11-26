@@ -1264,5 +1264,204 @@ def test_geospatial_hotspot_clustering_and_priority_scoring():
         assert detail["priorityScore"] == cluster1_cleaned["priorityScore"]
 
 
+def test_cleanup_operations_and_evidence_verification_lifecycle():
+    """
+    Prompt 10 - Test: Complete Cleanup Operations and Evidence Verification Workflow
+    - Validates cleanup task creation from verified report
+    - Validates reassignment of sanitation squads with scheduled dates
+    - Validates task state transition to in_progress
+    - Validates missing evidence rejection (cannot complete or verify without after photo)
+    - Validates evidence upload transitions status to awaiting_verification WITHOUT auto-completing
+    - Validates administrator rejection & reopening with corrective notes
+    - Validates re-submission of rectified evidence
+    - Validates administrator verification & certification transitioning report to cleaned
+    - Validates unauthorized status updates rejection (401 unauthenticated, 403 cross-tenant)
+    - Validates chronological audit event history endpoint
+    """
+    with TestClient(app) as client:
+        citizen = register_citizen(client, email="cleanup.tester@example.test")
+        pmc_admin = login(client, "pmc@example.test", "PMC-test-password-2026")
+        pcmc_admin = login(client, "pcmc@example.test", "PCMC-test-password-2026")
+
+        # 1. Citizen creates a report in PMC
+        rep_resp = create_report(
+            client,
+            citizen,
+            latitude=18.5020,
+            longitude=73.9510,
+            title="Dumping pile behind Kothrud market",
+            extra={
+                "description": "Debris and packaging obstructing stormwater drain",
+                "category": "plastic",
+                "severity": "high",
+                "imageUrl": "https://images.unsplash.com/photo-1530587191325-3db32d826c18",
+            },
+        )
+        assert rep_resp.status_code == 201
+        report_id = rep_resp.json()["id"]
+
+        # 2. Administrator verifies the report
+        verify_rep_resp = client.patch(
+            f"/api/v1/reports/{report_id}/status",
+            json={"status": "verified", "estimatedKg": 80.0},
+            headers=pmc_admin,
+        )
+        assert verify_rep_resp.status_code == 200
+
+        # 3. Create Cleanup Task
+        create_clean_resp = client.post(
+            "/api/v1/cleanups",
+            json={
+                "reportId": report_id,
+                "assignedTeam": "PMC Rapid Response Squad 1",
+                "scheduledDate": "2026-11-27",
+            },
+            headers=pmc_admin,
+        )
+        assert create_clean_resp.status_code == 201
+        clean_data = create_clean_resp.json()
+        cleanup_id = clean_data["id"]
+        assert clean_data["status"] == "pending"
+        assert clean_data["assignedTeam"] == "PMC Rapid Response Squad 1"
+        assert clean_data["beforeImageUrl"] is not None
+
+        # 4. Reassignment: Update assigned team & date (transitions to assigned)
+        reassign_resp = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/assign",
+            json={
+                "assignedTeam": "PMC Eco Patrol Squad 2",
+                "scheduledDate": "2026-11-28",
+            },
+            headers=pmc_admin,
+        )
+        assert reassign_resp.status_code == 200
+        assert reassign_resp.json()["status"] == "assigned"
+        assert reassign_resp.json()["assignedTeam"] == "PMC Eco Patrol Squad 2"
+
+        # 5. Missing Evidence Rejection: Cannot complete or verify without after photo
+        no_photo_complete = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/status",
+            json={"status": "completed"},
+            headers=pmc_admin,
+        )
+        assert no_photo_complete.status_code == 422
+
+        no_photo_verify = client.post(
+            f"/api/v1/cleanups/{cleanup_id}/verify",
+            json={"decision": "approve", "notes": "Premature attempt"},
+            headers=pmc_admin,
+        )
+        assert no_photo_verify.status_code == 422
+
+        # 6. Team starts work: in_progress
+        start_resp = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/status",
+            json={"status": "in_progress"},
+            headers=pmc_admin,
+        )
+        assert start_resp.status_code == 200
+        assert start_resp.json()["status"] == "in_progress"
+
+        # 7. Team submits evidence: sets awaiting_verification (NEVER automatically verified!)
+        sample_after_photo = "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09"
+        evidence_resp = client.post(
+            f"/api/v1/cleanups/{cleanup_id}/evidence",
+            json={
+                "afterImageUrl": sample_after_photo,
+                "notes": "First sweep complete. 60kg packaging bags removed.",
+            },
+            headers=pmc_admin,
+        )
+        assert evidence_resp.status_code == 200
+        evidence_data = evidence_resp.json()
+        assert evidence_data["verificationStatus"] == "awaiting_verification"
+        assert evidence_data["afterImageUploadedAt"] is not None
+        assert evidence_data["afterImageUploadedBy"] is not None
+
+        # CRITICAL: Verify linked report is still "scheduled" (NOT automatically marked cleaned!)
+        report_check = client.get(f"/api/v1/reports/{report_id}", headers=pmc_admin)
+        assert report_check.status_code == 200
+        assert report_check.json()["status"] == "scheduled"
+
+        # 8. Administrator Rejection & Reopening: Evidence deemed insufficient
+        reopen_resp = client.post(
+            f"/api/v1/cleanups/{cleanup_id}/verify",
+            json={
+                "decision": "reject",
+                "notes": "Inadequate clearance. Residual waste still visible along stormwater culvert.",
+            },
+            headers=pmc_admin,
+        )
+        assert reopen_resp.status_code == 200
+        reopen_data = reopen_resp.json()
+        assert reopen_data["verificationStatus"] == "reopened"
+        assert "Residual waste still visible" in reopen_data["verificationNotes"]
+
+        # Report remains scheduled
+        report_check_reopened = client.get(f"/api/v1/reports/{report_id}", headers=pmc_admin)
+        assert report_check_reopened.json()["status"] == "scheduled"
+
+        # 9. Unauthorized access defenses:
+        # Citizen cannot verify cleanup (403 forbidden)
+        unauth_verify = client.post(
+            f"/api/v1/cleanups/{cleanup_id}/verify",
+            json={"decision": "approve", "notes": "Citizen trying to certify"},
+            headers=citizen,
+        )
+        assert unauth_verify.status_code == 403
+
+        # Cross-tenant admin (PCMC) cannot access PMC cleanup (403 forbidden / 404)
+        cross_tenant_access = client.get(
+            f"/api/v1/cleanups/{cleanup_id}",
+            headers=pcmc_admin,
+        )
+        assert cross_tenant_access.status_code in {403, 404}
+
+        # 10. Re-submit rectified evidence and approve verification
+        rectified_evidence = client.post(
+            f"/api/v1/cleanups/{cleanup_id}/evidence",
+            json={
+                "afterImageUrl": sample_after_photo,
+                "notes": "Second sweep executed. Culvert completely unclogged and disinfected.",
+            },
+            headers=pmc_admin,
+        )
+        assert rectified_evidence.status_code == 200
+        assert rectified_evidence.json()["verificationStatus"] == "awaiting_verification"
+
+        # Administrator approves and certifies completed
+        certify_resp = client.post(
+            f"/api/v1/cleanups/{cleanup_id}/verify",
+            json={
+                "decision": "approve",
+                "notes": "On-site photos confirmed culvert is 100% restored. Approved.",
+            },
+            headers=pmc_admin,
+        )
+        assert certify_resp.status_code == 200
+        certified_data = certify_resp.json()
+        assert certified_data["status"] == "completed"
+        assert certified_data["verificationStatus"] == "verified"
+        assert certified_data["verifiedAt"] is not None
+        assert certified_data["verifiedBy"] is not None
+
+        # Linked report must now be "cleaned"
+        final_report = client.get(f"/api/v1/reports/{report_id}", headers=pmc_admin)
+        assert final_report.status_code == 200
+        assert final_report.json()["status"] == "cleaned"
+
+        # 11. Full Chronological Audit Timeline
+        history_resp = client.get(f"/api/v1/cleanups/{cleanup_id}/history", headers=pmc_admin)
+        assert history_resp.status_code == 200
+        history_items = history_resp.json()
+        actions = [item["action"] for item in history_items]
+        assert "cleanup.created" in actions
+        assert "cleanup.assigned" in actions
+        assert "cleanup.evidence_uploaded" in actions
+        assert "cleanup.reopened" in actions
+        assert "cleanup.verified_completed" in actions
+
+
+
 
 

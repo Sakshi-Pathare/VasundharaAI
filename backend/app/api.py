@@ -144,19 +144,43 @@ class ReportCreate(APIModel):
 
 
 class StatusUpdate(APIModel):
-    status: Literal["pending", "verified", "scheduled", "cleaned", "in_progress", "completed"]
+    status: Literal[
+        "pending",
+        "assigned",
+        "in_progress",
+        "awaiting_verification",
+        "completed",
+        "verified",
+        "reopened",
+        "rejected",
+        "scheduled",
+        "cleaned",
+    ]
+    notes: str | None = Field(default=None, max_length=4000)
     after_image_url: str | None = Field(default=None, max_length=12_000_000)
+
+
+class CleanupEvidence(APIModel):
+    after_image_url: str = Field(min_length=1, max_length=12_000_000)
+    notes: str | None = Field(default=None, max_length=4000)
+
+
+class CleanupVerify(APIModel):
+    decision: Literal["approve", "reject", "verify", "reopen"]
+    notes: str = Field(default="", max_length=4000)
 
 
 class CleanupCreate(APIModel):
     report_id: str = Field(min_length=1, max_length=32)
     assigned_team: str = Field(default="Municipal Sanitation Crew", max_length=160)
     scheduled_date: str | None = Field(default=None, max_length=40)
+    notes: str | None = Field(default=None, max_length=4000)
 
 
 class CleanupAssign(APIModel):
     assigned_team: str = Field(min_length=1, max_length=160)
     scheduled_date: str | None = Field(default=None, max_length=40)
+    notes: str | None = Field(default=None, max_length=4000)
 
 
 class InternalNoteUpdate(APIModel):
@@ -404,7 +428,33 @@ def _citizen_report_json(report: Report, db: Session) -> dict:
     return _report_json(report, db)
 
 
-def _cleanup_json(cleanup: Cleanup) -> dict:
+def _cleanup_json(cleanup: Cleanup, db: Session | None = None) -> dict:
+    v_status = cleanup.verification_status or "pending"
+    if v_status in {"awaiting_verification", "reopened", "assigned", "verified"}:
+        computed_status = "completed" if v_status == "verified" else v_status
+    elif cleanup.status == "completed":
+        computed_status = "completed"
+    elif cleanup.status == "in_progress":
+        computed_status = "in_progress"
+    else:
+        computed_status = "pending"
+
+    report_info = None
+    if db and cleanup.report_id:
+        report = db.get(Report, cleanup.report_id)
+        if report:
+            report_info = {
+                "id": report.id,
+                "title": report.title,
+                "address": report.address,
+                "latitude": report.latitude,
+                "longitude": report.longitude,
+                "category": report.category,
+                "severity": report.severity,
+                "status": report.status,
+                "imageUrl": report.image_url,
+            }
+
     return {
         "id": cleanup.id,
         "reportId": cleanup.report_id,
@@ -413,15 +463,25 @@ def _cleanup_json(cleanup: Cleanup) -> dict:
         "assignedTeam": cleanup.assigned_team,
         "contactLead": cleanup.contact_lead,
         "scheduledDate": cleanup.scheduled_date,
-        "status": cleanup.status,
+        "status": computed_status,
+        "rawStatus": cleanup.status,
+        "verificationStatus": v_status,
         "priority": cleanup.priority,
         "estimatedHours": cleanup.estimated_hours,
         "wasteVolumeEstimate": cleanup.waste_volume_estimate,
         "beforeImageUrl": cleanup.before_image_url,
         "afterImageUrl": cleanup.after_image_url,
+        "afterImageUploadedAt": cleanup.after_image_uploaded_at.isoformat() if cleanup.after_image_uploaded_at else None,
+        "afterImageUploadedBy": cleanup.after_image_uploaded_by,
+        "completionNotes": cleanup.completion_notes or cleanup.notes,
+        "verifiedAt": cleanup.verified_at.isoformat() if cleanup.verified_at else None,
+        "verifiedBy": cleanup.verified_by,
+        "verificationNotes": cleanup.verification_notes or "",
         "notes": cleanup.notes,
         "completedAt": cleanup.completed_at.isoformat() if cleanup.completed_at else None,
+        "createdAt": cleanup.created_at.isoformat() if cleanup.created_at else None,
         "updatedAt": cleanup.updated_at.isoformat() if cleanup.updated_at else None,
+        "report": report_info,
     }
 
 
@@ -1425,7 +1485,16 @@ def delete_admin_report(
 
 @api.get("/cleanups")
 def list_cleanups(
-    status: Literal["all", "pending", "in_progress", "completed"] = "all",
+    status: Literal[
+        "all",
+        "pending",
+        "assigned",
+        "in_progress",
+        "awaiting_verification",
+        "completed",
+        "verified",
+        "reopened",
+    ] = "all",
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
@@ -1435,10 +1504,58 @@ def list_cleanups(
     if not report_ids:
         return []
     query = select(Cleanup).where(Cleanup.report_id.in_(report_ids))
-    if status != "all":
-        query = query.where(Cleanup.status == status)
     cleanups = db.scalars(query.order_by(Cleanup.created_at.desc())).all()
-    return [_cleanup_json(item) for item in cleanups]
+    results = [_cleanup_json(item, db) for item in cleanups]
+    if status != "all":
+        results = [
+            item for item in results
+            if item["status"] == status
+            or item["verificationStatus"] == status
+            or (status in {"completed", "verified"} and item["rawStatus"] == "completed")
+            or (status == "pending" and item["rawStatus"] == "pending")
+        ]
+    return results
+
+
+@api.get("/cleanups/{cleanup_id}")
+def get_cleanup(
+    cleanup_id: str,
+    user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    _require_scoped_permission(user, "cleanups:read")
+    cleanup, report = _get_scoped_cleanup(db, cleanup_id, user)
+    return _cleanup_json(cleanup, db)
+
+
+@api.get("/cleanups/{cleanup_id}/history")
+def get_cleanup_history(
+    cleanup_id: str,
+    user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    _require_scoped_permission(user, "cleanups:read")
+    cleanup, report = _get_scoped_cleanup(db, cleanup_id, user)
+    audit_rows = db.scalars(
+        select(AuditLog)
+        .where(
+            AuditLog.report_id == report.id,
+            AuditLog.action.startswith("cleanup."),
+        )
+        .order_by(AuditLog.created_at.desc())
+    ).all()
+    history = []
+    for row in audit_rows:
+        actor = db.get(User, row.actor_user_id) if row.actor_user_id else None
+        history.append({
+            "id": row.id,
+            "action": row.action,
+            "actorName": actor.name if actor else "System Dispatch",
+            "actorRole": actor.role if actor else "system",
+            "details": row.details or {},
+            "timestamp": row.created_at.isoformat(),
+        })
+    return history
 
 
 @api.post("/cleanups", status_code=201)
@@ -1451,10 +1568,16 @@ def create_cleanup(
     report = _get_scoped_report(db, payload.report_id, user)
     existing = db.scalar(select(Cleanup).where(Cleanup.report_id == report.id))
     scheduled_date = payload.scheduled_date or (utc_now() + timedelta(days=1)).date().isoformat()
+    team_name = payload.assigned_team.strip()
+    v_status = "pending"
+
     if existing:
         existing.status = "pending"
-        existing.assigned_team = payload.assigned_team
+        existing.verification_status = v_status
+        existing.assigned_team = team_name
         existing.scheduled_date = scheduled_date
+        if payload.notes:
+            existing.notes = payload.notes
         existing.updated_at = utc_now()
         cleanup = existing
     else:
@@ -1463,26 +1586,31 @@ def create_cleanup(
             report_id=report.id,
             task_name=f"{report.title} Clearance",
             location=report.address or "Reported Location",
-            assigned_team=payload.assigned_team,
+            assigned_team=team_name,
             scheduled_date=scheduled_date,
             status="pending",
+            verification_status=v_status,
             priority=report.severity,
             estimated_hours=3.5 if report.estimated_kg > 20 else 1.5,
             waste_volume_estimate=f"{report.estimated_kg:g} kg",
             before_image_url=report.image_url,
-            notes=f"Generated from incident report ({report.id}): {report.description}",
+            notes=payload.notes or f"Generated from incident report ({report.id}): {report.description}",
         )
         db.add(cleanup)
+
     old_status = report.status
     report.status = "scheduled"
     report.updated_at = utc_now()
-    _audit(db, "cleanup.dispatched", actor=user, report=report, details={
-        "assignedTeam": payload.assigned_team,
+    _audit(db, "cleanup.created", actor=user, report=report, details={
+        "cleanupId": cleanup.id,
+        "assignedTeam": team_name,
+        "scheduledDate": scheduled_date,
         "previousReportStatus": old_status,
+        "status": v_status,
     })
     db.commit()
     db.refresh(cleanup)
-    return _cleanup_json(cleanup)
+    return _cleanup_json(cleanup, db)
 
 
 def _get_scoped_cleanup(db: Session, cleanup_id: str, user: User) -> tuple[Cleanup, Report]:
@@ -1502,26 +1630,203 @@ def update_cleanup_status(
 ):
     _require_scoped_permission(user, "cleanups:manage")
     cleanup, report = _get_scoped_cleanup(db, cleanup_id, user)
-    if payload.status not in {"pending", "in_progress", "completed"}:
-        raise HTTPException(status_code=422, detail="Cleanup status must be pending, in_progress, or completed.")
-    if payload.status == "completed" and not (payload.after_image_url or cleanup.after_image_url):
-        raise HTTPException(status_code=422, detail="Upload an after-cleanup photo before completing this task.")
-    if payload.after_image_url:
-        cleanup.after_image_url = _image_url(payload.after_image_url, cleanup.id)
+
+    target_status = payload.status.lower()
     old_status = cleanup.status
-    cleanup.status = payload.status
+    old_v_status = cleanup.verification_status
+
+    if target_status in {"completed", "verified"}:
+        if not (payload.after_image_url or cleanup.after_image_url):
+            raise HTTPException(status_code=422, detail="Upload an after-cleanup photo before completing this task.")
+        if payload.after_image_url:
+            cleanup.after_image_url = _image_url(payload.after_image_url, f"{cleanup.id}-after")
+            cleanup.after_image_uploaded_at = utc_now()
+            cleanup.after_image_uploaded_by = user.name or user.email
+        if payload.notes:
+            cleanup.completion_notes = payload.notes
+            cleanup.verification_notes = payload.notes
+
+        cleanup.status = "completed"
+        cleanup.verification_status = "verified"
+        cleanup.completed_at = utc_now()
+        cleanup.verified_at = utc_now()
+        cleanup.verified_by = user.name or user.email
+        cleanup.updated_at = utc_now()
+        report.status = "cleaned"
+        report.updated_at = utc_now()
+        _audit(db, "cleanup.verified_completed", actor=user, report=report, details={
+            "cleanupId": cleanup.id,
+            "fromStatus": old_status,
+            "toStatus": "completed",
+            "verificationStatus": "verified",
+            "notes": payload.notes,
+        })
+    elif target_status == "awaiting_verification":
+        if not (payload.after_image_url or cleanup.after_image_url):
+            raise HTTPException(status_code=422, detail="Upload genuine after-cleanup photographic evidence first.")
+        if payload.after_image_url:
+            cleanup.after_image_url = _image_url(payload.after_image_url, f"{cleanup.id}-after")
+            cleanup.after_image_uploaded_at = utc_now()
+            cleanup.after_image_uploaded_by = user.name or user.email
+        if payload.notes:
+            cleanup.completion_notes = payload.notes
+
+        cleanup.status = "in_progress"
+        cleanup.verification_status = "awaiting_verification"
+        cleanup.updated_at = utc_now()
+        report.status = "scheduled"
+        report.updated_at = utc_now()
+        _audit(db, "cleanup.evidence_uploaded", actor=user, report=report, details={
+            "cleanupId": cleanup.id,
+            "verificationStatus": "awaiting_verification",
+            "notes": payload.notes,
+        })
+    elif target_status in {"reopened", "rejected"}:
+        if not payload.notes or len(payload.notes.strip()) < 5:
+            raise HTTPException(status_code=422, detail="Provide specific reasons for reopening or rejecting evidence.")
+        cleanup.status = "in_progress"
+        cleanup.verification_status = "reopened"
+        cleanup.verification_notes = payload.notes
+        cleanup.updated_at = utc_now()
+        report.status = "scheduled"
+        report.updated_at = utc_now()
+        _audit(db, "cleanup.reopened", actor=user, report=report, details={
+            "cleanupId": cleanup.id,
+            "fromStatus": old_status,
+            "verificationStatus": "reopened",
+            "reopenNotes": payload.notes,
+        })
+    elif target_status == "in_progress":
+        cleanup.status = "in_progress"
+        cleanup.verification_status = "in_progress"
+        cleanup.updated_at = utc_now()
+        report.status = "scheduled"
+        report.updated_at = utc_now()
+        _audit(db, "cleanup.in_progress", actor=user, report=report, details={
+            "cleanupId": cleanup.id,
+            "fromStatus": old_status,
+            "toStatus": "in_progress",
+        })
+    elif target_status in {"assigned", "pending"}:
+        cleanup.status = "pending"
+        cleanup.verification_status = target_status
+        cleanup.updated_at = utc_now()
+        report.status = "scheduled"
+        report.updated_at = utc_now()
+        _audit(db, "cleanup.status_changed", actor=user, report=report, details={
+            "cleanupId": cleanup.id,
+            "fromStatus": old_status,
+            "toStatus": target_status,
+        })
+    else:
+        raise HTTPException(status_code=422, detail=f"Unrecognized cleanup status: {payload.status}")
+
+    db.commit()
+    db.refresh(cleanup)
+    return _cleanup_json(cleanup, db)
+
+
+@api.post("/cleanups/{cleanup_id}/evidence")
+def submit_cleanup_evidence(
+    cleanup_id: str,
+    payload: CleanupEvidence,
+    user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    _require_scoped_permission(user, "cleanups:manage")
+    cleanup, report = _get_scoped_cleanup(db, cleanup_id, user)
+
+    # Prevent unauthorized evidence replacement if already verified
+    if cleanup.verification_status == "verified" and user.role != "super_admin":
+        raise HTTPException(status_code=400, detail="Cannot replace evidence for an already verified cleanup. Administrator must reopen task first.")
+
+    image_url = _image_url(payload.after_image_url, f"{cleanup.id}-after")
+    cleanup.after_image_url = image_url
+    cleanup.after_image_uploaded_at = utc_now()
+    cleanup.after_image_uploaded_by = user.name or user.email
+    if payload.notes:
+        cleanup.completion_notes = payload.notes
+        cleanup.notes = f"{cleanup.notes}\n[Evidence Note]: {payload.notes}".strip()
+
+    # Transition to awaiting_verification (Never automatically mark as verified!)
+    old_status = cleanup.verification_status
+    cleanup.status = "in_progress"
+    cleanup.verification_status = "awaiting_verification"
     cleanup.updated_at = utc_now()
-    cleanup.completed_at = utc_now() if payload.status == "completed" else None
-    report.status = "cleaned" if payload.status == "completed" else "scheduled"
+    report.status = "scheduled"
     report.updated_at = utc_now()
-    _audit(db, "cleanup.status_changed", actor=user, report=report, details={
+
+    _audit(db, "cleanup.evidence_uploaded", actor=user, report=report, details={
         "cleanupId": cleanup.id,
-        "from": old_status,
-        "to": payload.status,
+        "afterImageUrl": image_url,
+        "uploadedBy": user.name or user.email,
+        "notes": payload.notes,
+        "previousStatus": old_status,
+        "newStatus": "awaiting_verification",
     })
     db.commit()
     db.refresh(cleanup)
-    return _cleanup_json(cleanup)
+    return _cleanup_json(cleanup, db)
+
+
+@api.post("/cleanups/{cleanup_id}/verify")
+def verify_cleanup(
+    cleanup_id: str,
+    payload: CleanupVerify,
+    user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    _require_scoped_permission(user, "cleanups:manage")
+    cleanup, report = _get_scoped_cleanup(db, cleanup_id, user)
+
+    decision = payload.decision.lower()
+    if decision in {"approve", "verify"}:
+        if not cleanup.after_image_url:
+            raise HTTPException(status_code=422, detail="Cannot verify completion without genuine after-cleanup photographic evidence.")
+
+        old_v_status = cleanup.verification_status
+        cleanup.status = "completed"
+        cleanup.verification_status = "verified"
+        cleanup.completed_at = utc_now()
+        cleanup.verified_at = utc_now()
+        cleanup.verified_by = user.name or user.email
+        if payload.notes:
+            cleanup.verification_notes = payload.notes
+
+        report.status = "cleaned"
+        report.updated_at = utc_now()
+
+        _audit(db, "cleanup.verified_completed", actor=user, report=report, details={
+            "cleanupId": cleanup.id,
+            "verifiedBy": user.name or user.email,
+            "notes": payload.notes,
+            "previousStatus": old_v_status,
+        })
+    elif decision in {"reject", "reopen"}:
+        if not payload.notes or len(payload.notes.strip()) < 5:
+            raise HTTPException(status_code=422, detail="Provide specific rejection notes explaining required remedial work.")
+
+        old_v_status = cleanup.verification_status
+        cleanup.status = "in_progress"
+        cleanup.verification_status = "reopened"
+        cleanup.verification_notes = payload.notes
+        cleanup.updated_at = utc_now()
+
+        report.status = "scheduled"
+        report.updated_at = utc_now()
+
+        _audit(db, "cleanup.reopened", actor=user, report=report, details={
+            "cleanupId": cleanup.id,
+            "reopenedBy": user.name or user.email,
+            "notes": payload.notes,
+            "previousStatus": old_v_status,
+        })
+    else:
+        raise HTTPException(status_code=422, detail="Decision must be 'approve' or 'reject'.")
+
+    db.commit()
+    db.refresh(cleanup)
+    return _cleanup_json(cleanup, db)
 
 
 @api.patch("/cleanups/{cleanup_id}/assign")
@@ -1533,17 +1838,24 @@ def assign_cleanup(
 ):
     _require_scoped_permission(user, "cleanups:manage")
     cleanup, report = _get_scoped_cleanup(db, cleanup_id, user)
+    previous_team = cleanup.assigned_team
     cleanup.assigned_team = payload.assigned_team.strip()
-    cleanup.scheduled_date = payload.scheduled_date
+    if payload.scheduled_date:
+        cleanup.scheduled_date = payload.scheduled_date
+    if payload.notes:
+        cleanup.notes = f"{cleanup.notes}\n[Assignment Note]: {payload.notes}".strip()
+    if cleanup.verification_status in {"pending", "reopened"}:
+        cleanup.verification_status = "assigned"
     cleanup.updated_at = utc_now()
     _audit(db, "cleanup.assigned", actor=user, report=report, details={
         "cleanupId": cleanup.id,
+        "previousTeam": previous_team,
         "assignedTeam": cleanup.assigned_team,
         "scheduledDate": cleanup.scheduled_date,
     })
     db.commit()
     db.refresh(cleanup)
-    return _cleanup_json(cleanup)
+    return _cleanup_json(cleanup, db)
 
 
 @api.get("/hotspots")

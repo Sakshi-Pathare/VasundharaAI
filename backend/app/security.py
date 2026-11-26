@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import AuthSession, Municipality, User
 
-PASSWORD_ROUNDS = 310_000
+PASSWORD_ROUNDS = 1_000 if os.getenv("TESTING") == "1" else 310_000
 SESSION_HOURS = 12
 bearer_scheme = HTTPBearer(auto_error=False)
 
