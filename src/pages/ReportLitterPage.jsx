@@ -26,6 +26,7 @@ import {
 import { Button } from '../components/common/Button';
 import { Card, CardHeader, CardBody } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
+import { Modal } from '../components/common/Modal';
 import { ImageUploader } from '../components/forms/ImageUploader';
 import { LocationPickerMap } from '../components/map/LocationPickerMap';
 import { DetectionOverlay } from '../components/reporting/DetectionOverlay';
@@ -48,6 +49,7 @@ export function ReportLitterPage() {
   const [locationSelected, setLocationSelected] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submittedReport, setSubmittedReport] = useState(null);
   const [formError, setFormError] = useState(null);
   const [copiedId, setCopiedId] = useState(false);
@@ -175,7 +177,7 @@ export function ReportLitterPage() {
 
   const currentImpact = materialImpacts[formData.category] || materialImpacts.mixed;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setFormError(null);
 
@@ -204,7 +206,14 @@ export function ReportLitterPage() {
       return;
     }
 
+    // Open verification confirmation modal
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setShowConfirmModal(false);
     setIsSubmitting(true);
+    setFormError(null);
     try {
       const response = await reportService.createReport({
         ...formData,
@@ -549,12 +558,13 @@ export function ReportLitterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>
-                    <label className="block text-xs font-bold text-charcoal-800 mb-1">
+                    <label htmlFor="report-address" className="block text-xs font-bold text-charcoal-800 mb-1">
                       Location / Landmark (Auto-resolved, editable)
                     </label>
                     <div className="relative">
                       <MapPin className="w-4 h-4 text-forest-700 absolute left-3.5 top-3" />
                       <input
+                        id="report-address"
                         type="text"
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -566,8 +576,9 @@ export function ReportLitterPage() {
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <label className="block font-bold text-charcoal-800 mb-1">Latitude</label>
+                      <label htmlFor="report-latitude" className="block font-bold text-charcoal-800 mb-1">Latitude</label>
                       <input
+                        id="report-latitude"
                         type="number"
                         step="any"
                         value={formData.latitude !== null ? formData.latitude : ''}
@@ -582,8 +593,9 @@ export function ReportLitterPage() {
                     </div>
 
                     <div>
-                      <label className="block font-bold text-charcoal-800 mb-1">Longitude</label>
+                      <label htmlFor="report-longitude" className="block font-bold text-charcoal-800 mb-1">Longitude</label>
                       <input
+                        id="report-longitude"
                         type="number"
                         step="any"
                         value={formData.longitude !== null ? formData.longitude : ''}
@@ -610,10 +622,11 @@ export function ReportLitterPage() {
               />
               <CardBody className="space-y-5">
                 <div>
-                  <label className="block text-xs font-bold text-charcoal-800 mb-1">
+                  <label htmlFor="report-title" className="block text-xs font-bold text-charcoal-800 mb-1">
                     Incident Title *
                   </label>
                   <input
+                    id="report-title"
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -625,10 +638,11 @@ export function ReportLitterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-charcoal-800 mb-1">
+                    <label htmlFor="report-category" className="block text-xs font-bold text-charcoal-800 mb-1">
                       Waste Category
                     </label>
                     <select
+                      id="report-category"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-forest-500 bg-white font-semibold"
@@ -644,10 +658,11 @@ export function ReportLitterPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-charcoal-800 mb-1">
+                    <label htmlFor="report-severity" className="block text-xs font-bold text-charcoal-800 mb-1">
                       Urgency / Severity
                     </label>
                     <select
+                      id="report-severity"
                       value={formData.severity}
                       onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
                       className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-forest-500 bg-white font-semibold"
@@ -659,10 +674,11 @@ export function ReportLitterPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-charcoal-800 mb-1">
+                    <label htmlFor="report-estimated-kg" className="block text-xs font-bold text-charcoal-800 mb-1">
                       Est. Waste Mass (kg)
                     </label>
                     <input
+                      id="report-estimated-kg"
                       type="number"
                       min="1"
                       max="500"
@@ -690,10 +706,11 @@ export function ReportLitterPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-charcoal-800 mb-1">
+                  <label htmlFor="report-description" className="block text-xs font-bold text-charcoal-800 mb-1">
                     Field Observations & Context Notes
                   </label>
                   <textarea
+                    id="report-description"
                     rows="3"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -724,10 +741,79 @@ export function ReportLitterPage() {
                 glow
                 className="shadow-soft-md"
               >
-                Submit Verified Report
+                Review & Submit Incident
               </Button>
             </div>
           </form>
+
+          {/* Pre-submission Verification Modal */}
+          <Modal
+            isOpen={showConfirmModal}
+            onClose={() => setShowConfirmModal(false)}
+            title="Verify Incident Report"
+            maxWidth="max-w-xl"
+          >
+            <div className="space-y-4 text-xs font-sans">
+              <p className="text-charcoal-600 font-medium">
+                Please review your report details before submitting to municipal dispatch and AI computer vision triage.
+              </p>
+
+              <div className="flex gap-4 items-start p-3.5 rounded-xl bg-sage-50/80 border border-sage-200">
+                {imagePreview && (
+                  <img
+                    src={imagePreview}
+                    alt="Evidence Preview"
+                    className="w-20 h-20 object-cover rounded-lg border border-sage-300 shrink-0"
+                  />
+                )}
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <h4 className="font-extrabold text-[#092421] text-sm truncate">
+                    {formData.title}
+                  </h4>
+                  <p className="text-charcoal-600 truncate text-[11px]">
+                    {formData.address || 'Geo-coordinate location'}
+                  </p>
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-[#1B4A45]">
+                    <span className="font-bold">GPS: {formData.latitude?.toFixed(4)}°, {formData.longitude?.toFixed(4)}°</span>
+                    <span>•</span>
+                    <span className="capitalize font-bold">{formData.category} ({formData.severity})</span>
+                    <span>•</span>
+                    <span className="font-bold">~{formData.estimatedKg} kg</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] leading-relaxed flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                <span>
+                  <b>YOLOv8 Computer Vision Triage:</b> Once submitted, the image will be analyzed to classify litter bounding boxes, compute severity, and associate this incident with municipal jurisdiction.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-sage-200">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={isSubmitting}
+                >
+                  Edit Information
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={Send}
+                  loading={isSubmitting}
+                  glow
+                  onClick={handleConfirmSubmit}
+                >
+                  Confirm & Submit
+                </Button>
+              </div>
+            </div>
+          </Modal>
         </>
       )}
     </div>

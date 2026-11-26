@@ -25,6 +25,7 @@ import { InteractiveMap } from '../components/map/InteractiveMap';
 import { Modal } from '../components/common/Modal';
 import { EmptyState } from '../components/common/EmptyState';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { DetectionOverlay } from '../components/reporting/DetectionOverlay';
 import { reportService } from '../services/reportService';
 import { hotspotService } from '../services/hotspotService';
 import { getSeverityBadgeProps, getStatusBadgeProps, getCategoryLabel } from '../utils/formatters';
@@ -425,16 +426,15 @@ export function PollutionMapPage() {
         {selectedReport && (
           <div className="space-y-5 text-xs text-charcoal-700 font-sans">
             {selectedReport.imageUrl && (
-              <div className="w-full h-64 rounded-2xl overflow-hidden bg-sage-100 border border-sage-200 shadow-soft relative group">
-                <img
-                  src={selectedReport.imageUrl}
-                  alt={selectedReport.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-3 left-3 px-3 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white font-mono text-[10px]">
-                  GPS: {selectedReport.latitude.toFixed(4)}°, {selectedReport.longitude.toFixed(4)}°
-                </div>
-              </div>
+              <DetectionOverlay
+                imageUrl={selectedReport.imageUrl}
+                detections={selectedReport.detections}
+                detectionNote={selectedReport.detectionNote}
+                aiStatus={selectedReport.aiStatus}
+                reportId={selectedReport.id}
+                currentCategory={selectedReport.category}
+                isEditable={false}
+              />
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

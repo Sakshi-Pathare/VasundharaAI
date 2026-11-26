@@ -28,6 +28,9 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' 
 
       {/* Modal Dialog */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : 'Dialog'}
         className={`relative w-full ${maxWidth} bg-white rounded-2xl shadow-soft-lg border border-sage-200 z-10 overflow-hidden transform transition-all my-8`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -35,7 +38,8 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' 
           <h3 className="text-lg font-semibold text-charcoal-900">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-charcoal-400 hover:text-charcoal-700 hover:bg-sage-100 transition-colors"
+            aria-label="Close dialog"
+            className="p-1 rounded-lg text-charcoal-400 hover:text-charcoal-700 hover:bg-sage-100 transition-colors focus-visible:ring-2 focus-visible:ring-[#2D6A4F] focus-visible:outline-none"
           >
             <X className="w-5 h-5" />
           </button>

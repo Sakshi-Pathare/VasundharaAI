@@ -13,6 +13,7 @@ import {
   Trash2,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   FileText,
   Compass,
 } from 'lucide-react';
@@ -35,6 +36,8 @@ export function MyReportsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'verified' | 'scheduled' | 'cleaned'
   const [deleteSuccess, setDeleteSuccess] = useState(null);
+  const [reportToDelete, setReportToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadReports();
@@ -53,16 +56,27 @@ export function MyReportsPage() {
     }
   };
 
-  const handleDeleteReport = async (id) => {
-    if (!window.confirm(`Are you sure you want to remove report ${id}?`)) return;
+  const handleDeleteReport = (id) => {
+    setReportToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!reportToDelete) return;
+    setIsDeleting(true);
     try {
-      await reportService.deleteReport(id);
-      setSelectedReport(null);
-      setDeleteSuccess(`Report ${id} removed successfully.`);
+      await reportService.deleteReport(reportToDelete);
+      if (selectedReport?.id === reportToDelete) {
+        setSelectedReport(null);
+      }
+      setDeleteSuccess(`Report ${reportToDelete} removed successfully.`);
+      setReportToDelete(null);
       loadReports();
       setTimeout(() => setDeleteSuccess(null), 3000);
     } catch (e) {
       console.error(e);
+      setError(e.message || 'Failed to remove report.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -308,6 +322,73 @@ export function MyReportsPage() {
               </div>
             </div>
 
+            {/* Visual Resolution Lifecycle Stepper */}
+            <div className="p-4 rounded-2xl bg-[#F4F7F2] border border-[#1B4332]/10 space-y-3">
+              <span className="text-[11px] font-bold text-charcoal-700 uppercase tracking-wider block">
+                Resolution Pipeline Progress
+              </span>
+              <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+                {/* Step 1: Received */}
+                <div className="space-y-1">
+                  <div className="w-6 h-6 mx-auto rounded-full bg-forest-800 text-white flex items-center justify-center font-bold">
+                    ✓
+                  </div>
+                  <span className="font-bold text-charcoal-900 block">Submitted</span>
+                  <span className="text-charcoal-500 block text-[9px]">{formatDate(selectedReport.reportedAt)}</span>
+                </div>
+
+                {/* Step 2: Verified */}
+                <div className="space-y-1">
+                  <div className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center font-bold ${
+                    ['verified', 'scheduled', 'cleaned'].includes(selectedReport.status)
+                      ? 'bg-blue-600 text-white'
+                      : selectedReport.status === 'rejected'
+                      ? 'bg-rose-500 text-white'
+                      : 'bg-charcoal-200 text-charcoal-500'
+                  }`}>
+                    {selectedReport.status === 'rejected' ? '✕' : ['verified', 'scheduled', 'cleaned'].includes(selectedReport.status) ? '✓' : '2'}
+                  </div>
+                  <span className={`font-bold block ${
+                    ['verified', 'scheduled', 'cleaned'].includes(selectedReport.status) ? 'text-blue-900' : 'text-charcoal-500'
+                  }`}>
+                    {selectedReport.status === 'rejected' ? 'Rejected' : 'Officer Verified'}
+                  </span>
+                </div>
+
+                {/* Step 3: Scheduled */}
+                <div className="space-y-1">
+                  <div className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center font-bold ${
+                    ['scheduled', 'cleaned'].includes(selectedReport.status)
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-charcoal-200 text-charcoal-500'
+                  }`}>
+                    {['scheduled', 'cleaned'].includes(selectedReport.status) ? '✓' : '3'}
+                  </div>
+                  <span className={`font-bold block ${
+                    ['scheduled', 'cleaned'].includes(selectedReport.status) ? 'text-amber-900' : 'text-charcoal-500'
+                  }`}>
+                    Squad Dispatched
+                  </span>
+                </div>
+
+                {/* Step 4: Cleaned */}
+                <div className="space-y-1">
+                  <div className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center font-bold ${
+                    selectedReport.status === 'cleaned'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-charcoal-200 text-charcoal-500'
+                  }`}>
+                    {selectedReport.status === 'cleaned' ? '✓' : '4'}
+                  </div>
+                  <span className={`font-bold block ${
+                    selectedReport.status === 'cleaned' ? 'text-emerald-900' : 'text-charcoal-500'
+                  }`}>
+                    Site Restored
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <div>
               <h4 className="font-bold text-charcoal-900 mb-1 text-xs">Incident Description</h4>
               <p className="p-3.5 rounded-xl bg-offwhite-100 border border-sage-200 text-charcoal-700 leading-relaxed text-xs font-medium">
@@ -336,6 +417,50 @@ export function MyReportsPage() {
           </div>
         )}
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      {reportToDelete && (
+        <Modal
+          isOpen={!!reportToDelete}
+          onClose={() => setReportToDelete(null)}
+          title="Withdraw Report"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 text-xs font-sans">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold">Are you sure you want to withdraw this incident report?</p>
+                <p className="text-charcoal-600 leading-relaxed text-[11px]">
+                  Report ID: <span className="font-mono font-bold text-charcoal-900">{reportToDelete}</span>. Once removed, this report will no longer be routed to municipal cleanup teams.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-sage-200">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReportToDelete(null)}
+                disabled={isDeleting}
+              >
+                Keep Report
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                icon={Trash2}
+                loading={isDeleting}
+                onClick={confirmDelete}
+              >
+                Withdraw Report
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

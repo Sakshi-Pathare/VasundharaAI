@@ -25,6 +25,8 @@ import {
   History,
   Eye,
   AlertTriangle,
+  Navigation,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { Card, CardHeader, CardBody } from '../components/common/Card';
@@ -404,6 +406,22 @@ export function CleanupManagementPage() {
                       <span>{task.afterImageUrl ? 'Compare Before & After' : 'Inspect Details'}</span>
                     </Button>
 
+                    {/* Quick GPS Navigation Link */}
+                    <a
+                      href={
+                        task.report?.latitude && task.report?.longitude
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${task.report.latitude},${task.report.longitude}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(task.report?.address || task.location || 'Pune')}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl border border-sage-300 bg-white hover:bg-sage-50 text-xs font-bold text-forest-800 hover:text-forest-950 inline-flex items-center gap-1.5 shadow-2xs transition-colors focus-visible:ring-2 focus-visible:ring-[#2D6A4F] focus-visible:outline-none"
+                      title="Open task location in Google Maps"
+                    >
+                      <Navigation className="w-3.5 h-3.5 text-forest-700" />
+                      <span>Navigate</span>
+                    </a>
+
                     {!isVerified && (
                       <Button
                         variant="secondary"
@@ -537,6 +555,34 @@ export function CleanupManagementPage() {
       >
         {selectedTask && (
           <div className="space-y-6 font-sans">
+            {/* Location & Navigation Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-sage-50 rounded-2xl border border-sage-200 text-xs">
+              <div className="space-y-0.5">
+                <span className="font-extrabold text-charcoal-900 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-forest-700 shrink-0" />
+                  {selectedTask.report?.address || selectedTask.location || 'Municipal Remediation Site'}
+                </span>
+                {selectedTask.report?.latitude && (
+                  <span className="text-[11px] font-mono text-charcoal-600 block pl-5.5">
+                    GPS Coordinates: {selectedTask.report.latitude.toFixed(5)}°, {selectedTask.report.longitude.toFixed(5)}°
+                  </span>
+                )}
+              </div>
+              <a
+                href={
+                  selectedTask.report?.latitude && selectedTask.report?.longitude
+                    ? `https://www.google.com/maps/dir/?api=1&destination=${selectedTask.report.latitude},${selectedTask.report.longitude}`
+                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedTask.report?.address || selectedTask.location || 'Pune')}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-forest-800 text-white hover:bg-forest-900 text-xs font-bold transition-all shadow-soft-xs"
+              >
+                <Navigation className="w-3.5 h-3.5 text-pista-300" />
+                <span>Get Directions</span>
+              </a>
+            </div>
+
             {/* Split Comparison View */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs">

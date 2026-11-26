@@ -322,12 +322,13 @@ export function LoginPage() {
                 <>
                   {/* Full Name */}
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-[#10241B]">
+                    <label htmlFor="register-name" className="block text-xs font-bold text-[#10241B]">
                       Full Name <span className="text-rose-600">*</span>
                     </label>
                     <div className="relative">
                       <User className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-3" />
                       <input
+                        id="register-name"
                         type="text"
                         required
                         value={formData.name}
@@ -340,12 +341,14 @@ export function LoginPage() {
 
                   {/* Role Selection */}
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-[#10241B]">
+                    <label id="role-selection-label" className="block text-xs font-bold text-[#10241B]">
                       Primary Stewardship Role
                     </label>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-2 gap-2 text-xs" role="radiogroup" aria-labelledby="role-selection-label">
                       <button
                         type="button"
+                        role="radio"
+                        aria-checked={formData.role === 'citizen'}
                         onClick={() => handleInputChange('role', 'citizen')}
                         className={`p-2.5 rounded-xl border text-left flex items-start gap-2 transition-all ${
                           formData.role === 'citizen'
@@ -364,6 +367,8 @@ export function LoginPage() {
 
                       <button
                         type="button"
+                        role="radio"
+                        aria-checked={formData.role === 'municipal_admin'}
                         onClick={() => handleInputChange('role', 'municipal_admin')}
                         className={`p-2.5 rounded-xl border text-left flex items-start gap-2 transition-all ${
                           formData.role === 'municipal_admin'
@@ -384,12 +389,13 @@ export function LoginPage() {
 
                   {/* Municipality selection */}
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-[#10241B]">
+                    <label htmlFor="register-municipality" className="block text-xs font-bold text-[#10241B]">
                       Affiliated Municipality
                     </label>
                     <div className="relative">
                       <Globe className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-3" />
                       <select
+                        id="register-municipality"
                         value={formData.municipalityName}
                         onChange={(e) => handleInputChange('municipalityName', e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-sage-300 focus:outline-none focus:ring-2 focus:ring-[#1B4332] bg-white text-charcoal-900 font-semibold"
@@ -404,12 +410,13 @@ export function LoginPage() {
 
                   {/* Phone */}
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-[#10241B]">
+                    <label htmlFor="register-phone" className="block text-xs font-bold text-[#10241B]">
                       Mobile Phone <span className="text-charcoal-400 font-normal">(for dispatch alerts)</span>
                     </label>
                     <div className="relative">
                       <Phone className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-3" />
                       <input
+                        id="register-phone"
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
@@ -423,12 +430,13 @@ export function LoginPage() {
 
               {/* Email Address */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-[#10241B]">
+                <label htmlFor="auth-email" className="block text-xs font-bold text-[#10241B]">
                   Email Address <span className="text-rose-600">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-3" />
                   <input
+                    id="auth-email"
                     type="email"
                     required
                     value={formData.email}
@@ -442,7 +450,7 @@ export function LoginPage() {
               {/* Password */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[#10241B]">
+                  <label htmlFor="auth-password" className="block text-xs font-bold text-[#10241B]">
                     Password <span className="text-rose-600">*</span>
                   </label>
                   {mode === 'login' && (
@@ -461,6 +469,7 @@ export function LoginPage() {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-3" />
                   <input
+                    id="auth-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={formData.password}
@@ -473,6 +482,7 @@ export function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3.5 top-2.5 text-charcoal-400 hover:text-charcoal-700"
                     title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -498,12 +508,13 @@ export function LoginPage() {
               {/* Confirm Password (In register mode) */}
               {mode === 'register' && (
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-[#10241B]">
+                  <label htmlFor="auth-confirm-password" className="block text-xs font-bold text-[#10241B]">
                     Confirm Password <span className="text-rose-600">*</span>
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-3" />
                     <input
+                      id="auth-confirm-password"
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
                       value={formData.confirmPassword}
@@ -515,6 +526,7 @@ export function LoginPage() {
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute right-3.5 top-2.5 text-charcoal-400 hover:text-charcoal-700"
+                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                     >
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -528,8 +540,9 @@ export function LoginPage() {
               {/* Remember Me / Stewardship Pledge */}
               {mode === 'login' ? (
                 <div className="flex items-center justify-between text-xs pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-[#242D2B] font-medium">
+                  <label htmlFor="remember-me" className="flex items-center gap-2 cursor-pointer select-none text-[#242D2B] font-medium">
                     <input
+                      id="remember-me"
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
@@ -540,8 +553,9 @@ export function LoginPage() {
                 </div>
               ) : (
                 <div className="p-3 rounded-xl bg-[#DEF5F1]/60 border border-[#98E0D5] text-[11px] space-y-1.5">
-                  <label className="flex items-start gap-2 cursor-pointer select-none text-[#092421] font-semibold leading-relaxed">
+                  <label htmlFor="pledge-consent" className="flex items-start gap-2 cursor-pointer select-none text-[#092421] font-semibold leading-relaxed">
                     <input
+                      id="pledge-consent"
                       type="checkbox"
                       checked={formData.agreedToPledge}
                       onChange={(e) => handleInputChange('agreedToPledge', e.target.checked)}

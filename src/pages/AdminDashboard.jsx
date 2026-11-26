@@ -47,6 +47,7 @@ import { StatWidget } from '../components/common/StatWidget';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
 import { Modal } from '../components/common/Modal';
+import { DetectionOverlay } from '../components/reporting/DetectionOverlay';
 import { analyticsService } from '../services/analyticsService';
 import { reportService } from '../services/reportService';
 import { hotspotService } from '../services/hotspotService';
@@ -68,6 +69,9 @@ export function AdminDashboard() {
   const [actionSuccess, setActionSuccess] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [showDefinitionsModal, setShowDefinitionsModal] = useState(false);
+  const [selectedReportForInspection, setSelectedReportForInspection] = useState(null);
+  const [reportToDelete, setReportToDelete] = useState(null);
+  const [deletingReport, setDeletingReport] = useState(false);
 
   // Filters State
   const [timeRange, setTimeRange] = useState('all'); // 'all' | '7d' | '30d' | '90d' | '180d' | '1y'
@@ -145,19 +149,28 @@ export function AdminDashboard() {
     }
   };
 
-  const handleDeleteReport = async (reportId) => {
-    if (!window.confirm(`Are you sure you want to permanently remove report ${reportId}?`)) {
-      return;
-    }
+  const handleDeleteReport = (reportId) => {
+    setReportToDelete(reportId);
+  };
+
+  const confirmDeleteReport = async () => {
+    if (!reportToDelete) return;
     setActionError(null);
+    setDeletingReport(true);
     try {
-      await reportService.deleteReport(reportId);
-      setActionSuccess(`Report ${reportId} deleted successfully.`);
+      await reportService.deleteReport(reportToDelete);
+      setActionSuccess(`Report ${reportToDelete} deleted successfully.`);
+      if (selectedReportForInspection?.id === reportToDelete) {
+        setSelectedReportForInspection(null);
+      }
+      setReportToDelete(null);
       loadAllData();
       setTimeout(() => setActionSuccess(null), 3000);
     } catch (e) {
       setActionError(e.message || 'Failed to delete report.');
       setTimeout(() => setActionError(null), 5000);
+    } finally {
+      setDeletingReport(false);
     }
   };
 
@@ -722,9 +735,9 @@ export function AdminDashboard() {
                       const statProps = getStatusBadgeProps(r.status);
 
                       return (
-                        <tr key={r.id} className="hover:bg-[#F4F7F2] transition-colors">
+                        <tr key={r.id} className="hover:bg-[#F4F7F2] transition-colors cursor-pointer" onClick={() => setSelectedReportForInspection(r)}>
                           <td className="py-3.5 px-4">
-                            <div className="font-extrabold text-charcoal-900">{r.title}</div>
+                            <div className="font-extrabold text-charcoal-900 hover:text-forest-800 transition-colors">{r.title}</div>
                             <div className="text-[11px] text-charcoal-500 truncate max-w-xs">{r.address}</div>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
@@ -741,7 +754,15 @@ export function AdminDashboard() {
                               {statProps.label}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5">
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              className="font-bold py-1 px-2 text-[#092421]"
+                              onClick={() => setSelectedReportForInspection(r)}
+                            >
+                              Inspect
+                            </Button>
                             {r.status === 'pending' && (
                               <Button
                                 variant="outline"
@@ -887,6 +908,144 @@ export function AdminDashboard() {
             <div className="pt-2 text-right">
               <Button variant="primary" size="sm" onClick={() => setShowDefinitionsModal(false)}>
                 Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Report Inspection Modal with YOLO Computer Vision Overlay */}
+      {selectedReportForInspection && (
+        <Modal
+          isOpen={!!selectedReportForInspection}
+          onClose={() => setSelectedReportForInspection(null)}
+          title={`Inspect Incident: ${selectedReportForInspection.title}`}
+          maxWidth="max-w-3xl"
+        >
+          <div className="space-y-4 text-xs font-sans">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#F4F7F2] rounded-xl border border-sage-200">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-xs text-[#092421]">{selectedReportForInspection.id}</span>
+                <span className="text-charcoal-400">•</span>
+                <span className="text-charcoal-600 font-medium">{formatDate(selectedReportForInspection.reportedAt)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[#092421] bg-white px-2.5 py-1 rounded-md border border-sage-200">
+                  {getCategoryLabel(selectedReportForInspection.category)}
+                </span>
+                <span className="font-bold uppercase text-[10px] bg-white px-2.5 py-1 rounded-md border border-sage-200">
+                  Severity: {selectedReportForInspection.severity}
+                </span>
+              </div>
+            </div>
+
+            {/* Photo & YOLO Detections */}
+            {selectedReportForInspection.imageUrl && (
+              <DetectionOverlay
+                imageUrl={selectedReportForInspection.imageUrl}
+                detections={selectedReportForInspection.detections}
+                detectionNote={selectedReportForInspection.detectionNote}
+                aiStatus={selectedReportForInspection.aiStatus}
+                reportId={selectedReportForInspection.id}
+                currentCategory={selectedReportForInspection.category}
+                isEditable={false}
+              />
+            )}
+
+            <div className="p-3 bg-white rounded-xl border border-sage-200 space-y-1">
+              <h5 className="font-bold text-charcoal-900">Incident Address & Geolocation</h5>
+              <p className="text-charcoal-600">{selectedReportForInspection.address || 'Geo-coordinate location'}</p>
+              <p className="font-mono text-[11px] text-[#1B4A45]">
+                GPS: {selectedReportForInspection.latitude?.toFixed(5)}°, {selectedReportForInspection.longitude?.toFixed(5)}°
+              </p>
+            </div>
+
+            {selectedReportForInspection.description && (
+              <div className="p-3 bg-white rounded-xl border border-sage-200 space-y-1">
+                <h5 className="font-bold text-charcoal-900">Citizen Observations</h5>
+                <p className="text-charcoal-700 leading-relaxed">{selectedReportForInspection.description}</p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-sage-200">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedReportForInspection(null)}
+              >
+                Close
+              </Button>
+
+              <div className="flex items-center gap-2">
+                {selectedReportForInspection.status === 'pending' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      handleVerify(selectedReportForInspection.id);
+                      setSelectedReportForInspection(null);
+                    }}
+                  >
+                    Verify Report
+                  </Button>
+                )}
+                {selectedReportForInspection.status !== 'cleaned' && selectedReportForInspection.status !== 'scheduled' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    glow
+                    onClick={() => {
+                      handleScheduleCleanup(selectedReportForInspection.id);
+                      setSelectedReportForInspection(null);
+                    }}
+                  >
+                    Schedule Cleanup
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {reportToDelete && (
+        <Modal
+          isOpen={!!reportToDelete}
+          onClose={() => setReportToDelete(null)}
+          title="Confirm Permanent Deletion"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 text-xs font-sans">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold">Are you sure you want to permanently delete this report?</p>
+                <p className="text-charcoal-600 leading-relaxed text-[11px]">
+                  Report ID: <span className="font-mono font-bold text-charcoal-900">{reportToDelete}</span>. This action removes the record and associated telemetry from municipal records.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-sage-200">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReportToDelete(null)}
+                disabled={deletingReport}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                icon={Trash2}
+                loading={deletingReport}
+                onClick={confirmDeleteReport}
+              >
+                Delete Report
               </Button>
             </div>
           </div>
