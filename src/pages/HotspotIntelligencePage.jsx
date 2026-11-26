@@ -28,7 +28,18 @@ import {
   Info,
   FileText,
   RotateCcw,
+  BarChart3,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { Button } from '../components/common/Button';
 import { Card, CardHeader, CardBody } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
@@ -189,6 +200,32 @@ export function HotspotIntelligencePage() {
   }, [hotspots]);
 
   const criticalCount = hotspots.filter((h) => h.priorityScore >= 80).length;
+
+  const priorityChartData = useMemo(() => {
+    const buckets = [
+      { range: 'Critical', shortRange: 'Critical (≥80)', count: 0, color: '#E11D48' },
+      { range: 'High', shortRange: 'High (60-79)', count: 0, color: '#F59E0B' },
+      { range: 'Medium', shortRange: 'Medium (40-59)', count: 0, color: '#10B981' },
+      { range: 'Low', shortRange: 'Low (<40)', count: 0, color: '#3B82F6' },
+    ];
+    hotspots.forEach((h) => {
+      const score = h.priorityScore || 0;
+      if (score >= 80) buckets[0].count++;
+      else if (score >= 60) buckets[1].count++;
+      else if (score >= 40) buckets[2].count++;
+      else buckets[3].count++;
+    });
+    return buckets;
+  }, [hotspots]);
+
+  const wardChartData = useMemo(() => {
+    const counts = {};
+    hotspots.forEach((h) => {
+      const w = h.ward || h.district || 'Unassigned';
+      counts[w] = (counts[w] || 0) + 1;
+    });
+    return Object.entries(counts).map(([ward, count]) => ({ ward, count }));
+  }, [hotspots]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 font-sans">
@@ -430,6 +467,75 @@ export function HotspotIntelligencePage() {
           </div>
         </div>
       </div>
+
+      {/* Visual Analytics Grid: Priority & Ward Distributions */}
+      {!loading && !error && hotspots.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <Card className="lg:col-span-6 border-sage-200/90 shadow-soft">
+            <CardHeader
+              title="Hotspot Priority Distribution"
+              subtitle="Distribution of filtered clusters across severity bands"
+              icon={Flame}
+            />
+            <CardBody>
+              <div className="h-64 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={priorityChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2EAE0" />
+                    <XAxis dataKey="range" tick={{ fontSize: 11, fill: '#597057', fontWeight: 600 }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#597057', fontWeight: 600 }} allowDecimals={false} />
+                    <Tooltip
+                      formatter={(val, name, item) => [`${val} clusters`, item.payload.shortRange]}
+                      contentStyle={{
+                        backgroundColor: '#FFFFFF',
+                        borderColor: '#CBDBC9',
+                        borderRadius: '0.75rem',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                      }}
+                    />
+                    <Bar dataKey="count" name="Clusters" radius={[4, 4, 0, 0]}>
+                      {priorityChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card className="lg:col-span-6 border-sage-200/90 shadow-soft">
+            <CardHeader
+              title="Ward-Wise Hotspot Clusters"
+              subtitle="Geographic cluster frequency across municipal wards"
+              icon={MapPin}
+            />
+            <CardBody>
+              <div className="h-64 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={wardChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2EAE0" />
+                    <XAxis dataKey="ward" tick={{ fontSize: 11, fill: '#597057', fontWeight: 600 }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#597057', fontWeight: 600 }} allowDecimals={false} />
+                    <Tooltip
+                      formatter={(val) => [`${val} clusters`, 'Hotspots']}
+                      contentStyle={{
+                        backgroundColor: '#FFFFFF',
+                        borderColor: '#CBDBC9',
+                        borderRadius: '0.75rem',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                      }}
+                    />
+                    <Bar dataKey="count" name="Hotspots" fill="#2D6A4F" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      )}
 
       {/* Hotspots Grid */}
       {loading ? (

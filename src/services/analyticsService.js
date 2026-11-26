@@ -6,30 +6,46 @@
 
 import { api, getAuthToken } from './apiClient.js';
 
+function buildQuery(params = {}) {
+  const parts = [];
+  if (params.timeRange && params.timeRange !== 'all') {
+    parts.push(`time_range=${encodeURIComponent(params.timeRange)}`);
+  }
+  if (params.wardId && params.wardId !== 'all') {
+    parts.push(`ward_id=${encodeURIComponent(params.wardId)}`);
+  }
+  if (params.municipalityId && params.municipalityId !== 'all') {
+    parts.push(`municipality_id=${encodeURIComponent(params.municipalityId)}`);
+  }
+  return parts.length ? `?${parts.join('&')}` : '';
+}
+
 export const analyticsService = {
   /**
-   * Retrieves high-level dashboard metrics.
+   * Retrieves high-level dashboard metrics from real database records.
    * If logged in as admin, fetches tenant-scoped /analytics/metrics;
    * otherwise fetches sanitized /public/metrics.
    */
-  async getDashboardMetrics() {
+  async getDashboardMetrics(filters = {}) {
     const token = getAuthToken();
+    const query = buildQuery(filters);
     if (token) {
       try {
-        return await api.get('/analytics/metrics');
+        return await api.get(`/analytics/metrics${query}`);
       } catch (err) {
         if (!err.isForbidden) throw err;
       }
     }
-    return await api.get('/public/metrics');
+    return await api.get(`/public/metrics${query}`);
   },
 
   /**
    * Retrieves 6-month historical pollution & remediation trends.
    */
-  async getPollutionTrends() {
+  async getPollutionTrends(filters = {}) {
     try {
-      const data = await api.get('/analytics/trends');
+      const query = buildQuery(filters);
+      const data = await api.get(`/analytics/trends${query}`);
       return Array.isArray(data) ? data : [];
     } catch {
       return [];
@@ -39,9 +55,47 @@ export const analyticsService = {
   /**
    * Retrieves material category distribution.
    */
-  async getCategoryBreakdown() {
+  async getCategoryBreakdown(filters = {}) {
     try {
-      const data = await api.get('/analytics/categories');
+      const query = buildQuery(filters);
+      const data = await api.get(`/analytics/categories${query}`);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Retrieves cleanup remediation completion trends over time.
+   */
+  async getCleanupTrends(filters = {}) {
+    try {
+      const query = buildQuery(filters);
+      const data = await api.get(`/analytics/cleanup-trends${query}`);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Retrieves hotspot priority and spatial distribution.
+   */
+  async getHotspotDistribution(filters = {}) {
+    try {
+      const query = buildQuery(filters);
+      return await api.get(`/analytics/hotspot-distribution${query}`);
+    } catch {
+      return { totalHotspots: 0, priorityDistribution: [], wardDistribution: [] };
+    }
+  },
+
+  /**
+   * Retrieves municipality-level performance distribution (super_admin / comparative).
+   */
+  async getMunicipalityStats() {
+    try {
+      const data = await api.get('/analytics/municipalities');
       return Array.isArray(data) ? data : [];
     } catch {
       return [];
@@ -51,9 +105,10 @@ export const analyticsService = {
   /**
    * Retrieves ward-level incident distribution (admin only).
    */
-  async getWardStats() {
+  async getWardStats(filters = {}) {
     try {
-      const data = await api.get('/admin/ward-stats');
+      const query = buildQuery(filters);
+      const data = await api.get(`/admin/ward-stats${query}`);
       return Array.isArray(data) ? data : [];
     } catch {
       return [];

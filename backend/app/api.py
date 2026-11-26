@@ -877,27 +877,111 @@ def _scoped_reports(db: Session, user: User) -> list[Report]:
     return db.scalars(query.order_by(Report.reported_at.desc())).all()
 
 
+def _filter_reports_by_range(reports: list[Report], time_range: str | None) -> list[Report]:
+    if not time_range or time_range in {"all", "all_time"}:
+        return reports
+    now = utc_now()
+    days_map = {"7d": 7, "30d": 30, "90d": 90, "180d": 180, "1y": 365}
+    days = days_map.get(time_range)
+    if not days:
+        return reports
+    cutoff = now - timedelta(days=days)
+    result = []
+    for r in reports:
+        rep_time = r.reported_at if r.reported_at.tzinfo else r.reported_at.replace(tzinfo=timezone.utc)
+        if rep_time >= cutoff:
+            result.append(r)
+    return result
+
+
 def _metrics(reports: list[Report], cleanups: list[Cleanup], db: Session) -> dict:
+    total = len(reports)
     pending = sum(report.status == "pending" for report in reports)
     verified = sum(report.status == "verified" for report in reports)
     scheduled = sum(report.status == "scheduled" for report in reports)
     cleaned = sum(report.status == "cleaned" for report in reports)
-    active = sum(item.status in {"pending", "in_progress"} for item in cleanups)
+    rejected = sum(report.status == "rejected" for report in reports)
+
     hotspots = _hotspots(reports, db)
-    total = len(reports)
+    active_hotspots = len(hotspots)
+    high_priority_hotspots = sum(h.get("priorityScore", 0) >= 70 for h in hotspots)
+    critical_hotspots = sum(h.get("priorityScore", 0) >= 80 for h in hotspots)
+
+    cleanup_tasks = len(cleanups)
+    completed_cleanups = sum(item.status == "completed" for item in cleanups)
+    verified_cleanups = sum(item.verification_status == "verified" for item in cleanups)
+    awaiting_verification = sum(item.verification_status == "awaiting_verification" for item in cleanups)
+    in_progress_cleanups = sum(item.status == "in_progress" for item in cleanups)
+    pending_cleanups = sum(item.status == "pending" for item in cleanups)
+
+    # Average verification time calculation from actual database records
+    verified_report_ids = [r.id for r in reports if r.status in {"verified", "scheduled", "cleaned"}]
+    verification_durations: list[float] = []
+    if verified_report_ids:
+        audit_logs = db.scalars(
+            select(AuditLog).where(
+                AuditLog.report_id.in_(verified_report_ids),
+                AuditLog.action.in_(["report_verified", "report.status_updated", "report.verified"]),
+            )
+        ).all()
+        audit_map = {log.report_id: log.created_at for log in audit_logs}
+        for r in reports:
+            if r.status in {"verified", "scheduled", "cleaned"}:
+                verify_time = audit_map.get(r.id) or r.updated_at
+                rep_time = r.reported_at
+                if verify_time and rep_time:
+                    t1 = verify_time if verify_time.tzinfo else verify_time.replace(tzinfo=timezone.utc)
+                    t0 = rep_time if rep_time.tzinfo else rep_time.replace(tzinfo=timezone.utc)
+                    dur = (t1 - t0).total_seconds() / 3600.0
+                    if dur >= 0:
+                        verification_durations.append(dur)
+    average_verification_time_hours = round(sum(verification_durations) / len(verification_durations), 1) if verification_durations else None
+
+    # Average cleanup completion time calculation from actual cleanups
+    cleanup_durations: list[float] = []
+    for c in cleanups:
+        if c.verification_status == "verified" or c.status == "completed":
+            finish_time = c.verified_at or c.after_image_uploaded_at or c.updated_at
+            start_time = c.created_at
+            if finish_time and start_time:
+                t1 = finish_time if finish_time.tzinfo else finish_time.replace(tzinfo=timezone.utc)
+                t0 = start_time if start_time.tzinfo else start_time.replace(tzinfo=timezone.utc)
+                dur = (t1 - t0).total_seconds() / 3600.0
+                if dur >= 0:
+                    cleanup_durations.append(dur)
+    average_cleanup_completion_time_hours = round(sum(cleanup_durations) / len(cleanup_durations), 1) if cleanup_durations else None
+
+    # Total waste collected (kg)
+    total_waste_kg = round(sum(report.estimated_kg for report in reports if report.status == "cleaned" and report.estimated_kg), 1)
+
     return {
+        # Core prompt 11 metrics
         "totalReports": total,
-        "pendingReports": pending,
         "verifiedReports": verified,
-        "scheduledCleanups": scheduled,
-        "completedCleanups": cleaned,
+        "pendingReports": pending,
+        "rejectedReports": rejected,
+        "scheduledReports": scheduled,
+        "cleanedReports": cleaned,
+        "activeHotspots": active_hotspots,
+        "highPriorityHotspots": high_priority_hotspots,
+        "criticalHotspots": critical_hotspots,
+        "cleanupTasks": cleanup_tasks,
+        "completedCleanups": completed_cleanups,
+        "verifiedCleanups": verified_cleanups,
+        "awaitingVerificationCleanups": awaiting_verification,
+        "inProgressCleanups": in_progress_cleanups,
+        "pendingCleanups": pending_cleanups,
+        "averageVerificationTimeHours": average_verification_time_hours,
+        "averageCleanupCompletionTimeHours": average_cleanup_completion_time_hours,
+        "totalWasteCollectedKg": total_waste_kg,
+
+        # Backward-compatible aliases for legacy pages
         "totalReportsLogged": total,
         "verifiedIncidents": verified + scheduled + cleaned,
         "pendingReview": pending,
-        "activeCleanupTasks": active,
-        "totalWasteCollectedKg": round(sum(report.estimated_kg for report in reports if report.status == "cleaned"), 1),
-        "averageResponseTimeHours": 0,
-        "activeHotspotsTracked": len(hotspots),
+        "activeCleanupTasks": in_progress_cleanups + pending_cleanups,
+        "averageResponseTimeHours": average_verification_time_hours or 0,
+        "activeHotspotsTracked": active_hotspots,
         "communityVolunteers": len({report.citizen_user_id for report in reports if report.citizen_user_id}),
         "civicSatisfactionScore": None,
     }
@@ -1908,22 +1992,36 @@ def get_admin_hotspot(
 
 @api.get("/analytics/metrics")
 def get_analytics_metrics(
+    time_range: str | None = Query(default=None),
+    ward_id: str | None = Query(default=None),
+    municipality_id: str | None = Query(default=None),
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     _require_scoped_permission(user, "analytics:read")
     reports = _scoped_reports(db, user)
+    if municipality_id and user.role == "super_admin":
+        reports = [r for r in reports if r.municipality_id == municipality_id]
+    if ward_id and ward_id != "all":
+        reports = [r for r in reports if r.ward_id == ward_id]
+    reports = _filter_reports_by_range(reports, time_range)
     return _metrics(reports, _cleanup_rows_for_reports(db, reports), db)
 
 
 @api.get("/analytics/trends")
 def get_analytics_trends(
+    time_range: str | None = Query(default=None),
+    ward_id: str | None = Query(default=None),
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     _require_scoped_permission(user, "analytics:read")
     reports = _scoped_reports(db, user)
-    now = datetime.now(timezone.utc)
+    if ward_id and ward_id != "all":
+        reports = [r for r in reports if r.ward_id == ward_id]
+    
+    # 6-month monthly trends
+    now = utc_now()
     trends = []
     for offset in range(5, -1, -1):
         month_number = now.month - offset
@@ -1938,21 +2036,32 @@ def get_analytics_trends(
             reported_at = report.reported_at.replace(tzinfo=timezone.utc) if report.reported_at.tzinfo is None else report.reported_at
             if month_start <= reported_at < next_month:
                 month_reports.append(report)
+        month_cleanups = _cleanup_rows_for_reports(db, month_reports)
         trends.append({
-            "month": month_start.strftime("%b"),
+            "month": month_start.strftime("%b %Y"),
+            "monthShort": month_start.strftime("%b"),
             "reports": len(month_reports),
-            "resolved": sum(report.status == "cleaned" for report in month_reports),
-            "hotspotAlerts": 0,
+            "pending": sum(r.status == "pending" for r in month_reports),
+            "verified": sum(r.status == "verified" for r in month_reports),
+            "resolved": sum(r.status == "cleaned" for r in month_reports),
+            "cleanupsCreated": len(month_cleanups),
+            "cleanupsCompleted": sum(c.verification_status == "verified" or c.status == "completed" for c in month_cleanups),
         })
     return trends
 
 
 @api.get("/analytics/categories")
 def get_analytics_categories(
+    time_range: str | None = Query(default=None),
+    ward_id: str | None = Query(default=None),
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     _require_scoped_permission(user, "analytics:read")
+    reports = _scoped_reports(db, user)
+    if ward_id and ward_id != "all":
+        reports = [r for r in reports if r.ward_id == ward_id]
+    reports = _filter_reports_by_range(reports, time_range)
     labels = {
         "plastic": ("Plastics & Packaging", "#184730"),
         "mixed": ("Mixed Public Litter", "#758F71"),
@@ -1962,34 +2071,221 @@ def get_analytics_categories(
         "metal": ("Metals & Scrap", "#D97706"),
         "organic": ("Organic Waste", "#65A30D"),
     }
-    counts = Counter(report.category for report in _scoped_reports(db, user))
+    counts = Counter(report.category for report in reports)
     total_reports = sum(counts.values())
+    if not total_reports:
+        return []
     return [
         {
-            "name": labels[key][0],
-            "value": count / total_reports * 100,
-            "color": labels[key][1],
+            "category": key,
+            "name": labels.get(key, (key.capitalize(), "#758F71"))[0],
+            "count": count,
+            "value": round(count / total_reports * 100, 1),
+            "color": labels.get(key, (key.capitalize(), "#758F71"))[1],
+            "estimatedKg": round(sum(r.estimated_kg for r in reports if r.category == key and r.estimated_kg), 1),
         }
         for key, count in counts.items()
-        if count and total_reports
+        if count
     ]
 
 
-@api.get("/admin/ward-stats")
-def admin_ward_stats(
+@api.get("/analytics/cleanup-trends")
+def get_analytics_cleanup_trends(
+    ward_id: str | None = Query(default=None),
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     _require_scoped_permission(user, "analytics:read")
     reports = _scoped_reports(db, user)
+    if ward_id and ward_id != "all":
+        reports = [r for r in reports if r.ward_id == ward_id]
+    cleanups = _cleanup_rows_for_reports(db, reports)
+    now = utc_now()
+    trends = []
+    for offset in range(5, -1, -1):
+        month_number = now.month - offset
+        year = now.year
+        while month_number <= 0:
+            month_number += 12
+            year -= 1
+        month_start = datetime(year, month_number, 1, tzinfo=timezone.utc)
+        next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+        created_count = 0
+        verified_count = 0
+        awaiting_count = 0
+        for c in cleanups:
+            c_time = c.created_at if c.created_at.tzinfo else c.created_at.replace(tzinfo=timezone.utc)
+            if month_start <= c_time < next_month:
+                created_count += 1
+            if c.verified_at:
+                v_time = c.verified_at if c.verified_at.tzinfo else c.verified_at.replace(tzinfo=timezone.utc)
+                if month_start <= v_time < next_month:
+                    verified_count += 1
+            elif c.status == "completed":
+                u_time = c.updated_at if c.updated_at.tzinfo else c.updated_at.replace(tzinfo=timezone.utc)
+                if month_start <= u_time < next_month:
+                    verified_count += 1
+            if c.verification_status == "awaiting_verification":
+                if c.after_image_uploaded_at:
+                    a_time = c.after_image_uploaded_at if c.after_image_uploaded_at.tzinfo else c.after_image_uploaded_at.replace(tzinfo=timezone.utc)
+                    if month_start <= a_time < next_month:
+                        awaiting_count += 1
+
+        trends.append({
+            "month": month_start.strftime("%b %Y"),
+            "monthShort": month_start.strftime("%b"),
+            "tasksCreated": created_count,
+            "tasksVerified": verified_count,
+            "awaitingVerification": awaiting_count,
+        })
+    return trends
+
+
+@api.get("/analytics/hotspot-distribution")
+def get_analytics_hotspot_distribution(
+    time_range: str | None = Query(default=None),
+    ward_id: str | None = Query(default=None),
+    user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    _require_scoped_permission(user, "analytics:read")
+    reports = _scoped_reports(db, user)
+    reports = _filter_reports_by_range(reports, time_range)
+    if ward_id and ward_id != "all":
+        reports = [r for r in reports if r.ward_id == ward_id]
+
+    hotspots = _hotspots(reports, db)
+
+    priority_buckets = [
+        {"range": "Critical (80-100)", "shortRange": "Critical", "count": 0, "color": "#E11D48"},
+        {"range": "High (60-79)", "shortRange": "High", "count": 0, "color": "#F59E0B"},
+        {"range": "Medium (40-59)", "shortRange": "Medium", "count": 0, "color": "#10B981"},
+        {"range": "Low (0-39)", "shortRange": "Low", "count": 0, "color": "#3B82F6"},
+    ]
+
+    for h in hotspots:
+        score = h.get("priorityScore", 0)
+        if score >= 80:
+            priority_buckets[0]["count"] += 1
+        elif score >= 60:
+            priority_buckets[1]["count"] += 1
+        elif score >= 40:
+            priority_buckets[2]["count"] += 1
+        else:
+            priority_buckets[3]["count"] += 1
+
+    ward_counts = Counter(h.get("ward") or "Unassigned" for h in hotspots)
+    ward_data = [
+        {"ward": ward, "hotspots": count}
+        for ward, count in sorted(ward_counts.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    return {
+        "totalHotspots": len(hotspots),
+        "priorityDistribution": priority_buckets,
+        "wardDistribution": ward_data,
+    }
+
+
+@api.get("/analytics/municipalities")
+def get_analytics_municipalities(
+    user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    _require_scoped_permission(user, "analytics:read")
+    all_reports = _scoped_reports(db, user)
+    cleanups = _cleanup_rows_for_reports(db, all_reports)
+    cleanup_by_report = {c.report_id: c for c in cleanups}
+    hotspots = _hotspots(all_reports, db)
+
+    municipalities = db.scalars(select(Municipality).where(Municipality.active.is_(True))).all()
+    result = []
+    for m in municipalities:
+        m_reports = [r for r in all_reports if r.municipality_id == m.id or r.municipality_id == m.code]
+        m_hotspots = [h for h in hotspots if h.get("municipalityId") == m.id or h.get("municipalityId") == m.code]
+        m_cleanups = [cleanup_by_report[r.id] for r in m_reports if r.id in cleanup_by_report]
+
+        if user.role == "super_admin" or user.municipality_id in {m.id, m.code}:
+            result.append({
+                "municipalityId": m.id,
+                "code": m.code,
+                "name": m.name,
+                "totalReports": len(m_reports),
+                "verifiedReports": sum(r.status == "verified" for r in m_reports),
+                "pendingReports": sum(r.status == "pending" for r in m_reports),
+                "cleanedReports": sum(r.status == "cleaned" for r in m_reports),
+                "activeHotspots": len(m_hotspots),
+                "completedCleanups": sum(c.status == "completed" for c in m_cleanups),
+                "verifiedCleanups": sum(c.verification_status == "verified" for c in m_cleanups),
+            })
+    return result
+
+
+@api.get("/admin/ward-stats")
+def admin_ward_stats(
+    time_range: str | None = Query(default=None),
+    user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    _require_scoped_permission(user, "analytics:read")
+    reports = _scoped_reports(db, user)
+    reports = _filter_reports_by_range(reports, time_range)
+    cleanups = _cleanup_rows_for_reports(db, reports)
+    cleanup_by_report = {c.report_id: c for c in cleanups}
+    hotspots = _hotspots(reports, db)
+
     by_ward: dict[str, dict] = {}
     for report in reports:
-        ward_id = report.ward_id or "Unassigned ward"
-        stats = by_ward.setdefault(ward_id, {"wardId": ward_id, "totalReports": 0, "cleanedReports": 0, "pendingReports": 0})
+        ward_id = report.ward_id or "Unassigned"
+        stats = by_ward.setdefault(ward_id, {
+            "wardId": ward_id,
+            "totalReports": 0,
+            "verifiedReports": 0,
+            "pendingReports": 0,
+            "rejectedReports": 0,
+            "cleanedReports": 0,
+            "cleanupTasks": 0,
+            "hotspotsCount": 0,
+            "avgPriorityScore": 0.0,
+        })
         stats["totalReports"] += 1
-        stats["cleanedReports"] += report.status == "cleaned"
-        stats["pendingReports"] += report.status == "pending"
-    return list(by_ward.values())
+        if report.status == "verified":
+            stats["verifiedReports"] += 1
+        elif report.status == "pending":
+            stats["pendingReports"] += 1
+        elif report.status == "rejected":
+            stats["rejectedReports"] += 1
+        elif report.status == "cleaned":
+            stats["cleanedReports"] += 1
+
+        if report.id in cleanup_by_report:
+            stats["cleanupTasks"] += 1
+
+    # Associate hotspots with wards
+    ward_hotspot_scores: dict[str, list[float]] = {}
+    for h in hotspots:
+        w_id = h.get("ward") or "Unassigned"
+        if w_id not in by_ward:
+            by_ward[w_id] = {
+                "wardId": w_id,
+                "totalReports": 0,
+                "verifiedReports": 0,
+                "pendingReports": 0,
+                "rejectedReports": 0,
+                "cleanedReports": 0,
+                "cleanupTasks": 0,
+                "hotspotsCount": 0,
+                "avgPriorityScore": 0.0,
+            }
+        by_ward[w_id]["hotspotsCount"] += 1
+        ward_hotspot_scores.setdefault(w_id, []).append(h.get("priorityScore", 0))
+
+    for w_id, scores in ward_hotspot_scores.items():
+        if w_id in by_ward and scores:
+            by_ward[w_id]["avgPriorityScore"] = round(sum(scores) / len(scores), 1)
+
+    return sorted(list(by_ward.values()), key=lambda x: x["totalReports"], reverse=True)
 
 
 @api.get("/admin/citizens")

@@ -1462,6 +1462,195 @@ def test_cleanup_operations_and_evidence_verification_lifecycle():
         assert "cleanup.verified_completed" in actions
 
 
+def test_database_driven_analytics_dashboard_metrics_and_trends():
+    """
+    PROMPT 11 Test: Real Database-Driven Analytics Dashboard.
+    Verifies that all metrics, trends, category distributions, ward stats, and cleanup
+    aggregations derive strictly from actual database records without mock fallbacks,
+    handles empty datasets gracefully, strictly distinguishes completed from verified cleanups,
+    and enforces tenant isolation.
+    """
+    with TestClient(app) as client:
+        citizen = register_citizen(client, email="analytics.citizen@example.test")
+        pmc_admin = login(client, "pmc@example.test", "PMC-test-password-2026")
+        pcmc_admin = login(client, "pcmc@example.test", "PCMC-test-password-2026")
+
+        # 1. Empty Dataset Behavior (Zero records in PMC)
+        empty_metrics_resp = client.get("/api/v1/analytics/metrics", headers=pmc_admin)
+        assert empty_metrics_resp.status_code == 200
+        empty_m = empty_metrics_resp.json()
+        assert empty_m["totalReports"] == 0
+        assert empty_m["pendingReports"] == 0
+        assert empty_m["verifiedReports"] == 0
+        assert empty_m["rejectedReports"] == 0
+        assert empty_m["activeHotspots"] == 0
+        assert empty_m["highPriorityHotspots"] == 0
+        assert empty_m["cleanupTasks"] == 0
+        assert empty_m["completedCleanups"] == 0
+        assert empty_m["verifiedCleanups"] == 0
+        assert empty_m["totalWasteCollectedKg"] == 0.0
+        assert empty_m["averageVerificationTimeHours"] is None
+        assert empty_m["averageCleanupCompletionTimeHours"] is None
+
+        # Empty categories should return [] rather than crashing or dividing by zero
+        empty_cat_resp = client.get("/api/v1/analytics/categories", headers=pmc_admin)
+        assert empty_cat_resp.status_code == 200
+        assert empty_cat_resp.json() == []
+
+        # Empty trends should return 6 monthly buckets with 0 reports
+        empty_trends_resp = client.get("/api/v1/analytics/trends", headers=pmc_admin)
+        assert empty_trends_resp.status_code == 200
+        assert len(empty_trends_resp.json()) == 6
+        assert all(t["reports"] == 0 for t in empty_trends_resp.json())
+
+        # Empty hotspot distribution
+        empty_hd_resp = client.get("/api/v1/analytics/hotspot-distribution", headers=pmc_admin)
+        assert empty_hd_resp.status_code == 200
+        assert empty_hd_resp.json()["totalHotspots"] == 0
+        assert all(b["count"] == 0 for b in empty_hd_resp.json()["priorityDistribution"])
+
+        # 2. Populate Genuine Diverse Reports in PMC (Lat: ~18.50, Lng: ~73.95)
+        # R1: Pending report (plastic, 10kg)
+        r1 = create_report(
+            client, citizen, latitude=18.5020, longitude=73.9510, title="Litter pile 1",
+            extra={"category": "plastic", "severity": "medium", "estimatedKg": 10.0}
+        ).json()["id"]
+
+        # R2: Verified report (metal, 25kg)
+        r2 = create_report(
+            client, citizen, latitude=18.5025, longitude=73.9515, title="Litter pile 2",
+            extra={"category": "metal", "severity": "high", "estimatedKg": 25.0}
+        ).json()["id"]
+        client.patch(f"/api/v1/reports/{r2}/status", json={"status": "verified"}, headers=pmc_admin)
+
+        # R3: Scheduled report (glass, 15kg) with in_progress cleanup
+        r3 = create_report(
+            client, citizen, latitude=18.5030, longitude=73.9520, title="Litter pile 3",
+            extra={"category": "glass", "severity": "high", "estimatedKg": 15.0}
+        ).json()["id"]
+        client.patch(f"/api/v1/reports/{r3}/status", json={"status": "verified"}, headers=pmc_admin)
+        c3 = client.post(
+            "/api/v1/cleanups",
+            json={"reportId": r3, "assignedTeam": "PMC Squad Alpha", "scheduledDate": "2026-11-28"},
+            headers=pmc_admin,
+        ).json()["id"]
+        client.patch(f"/api/v1/cleanups/{c3}/status", json={"status": "in_progress"}, headers=pmc_admin)
+
+        # R4: Cleaned report (plastic, 50kg) with photo-verified completed cleanup
+        r4 = create_report(
+            client, citizen, latitude=18.5035, longitude=73.9525, title="Litter pile 4",
+            extra={"category": "plastic", "severity": "high", "estimatedKg": 50.0}
+        ).json()["id"]
+        client.patch(f"/api/v1/reports/{r4}/status", json={"status": "verified"}, headers=pmc_admin)
+        c4 = client.post(
+            "/api/v1/cleanups",
+            json={"reportId": r4, "assignedTeam": "PMC Squad Beta", "scheduledDate": "2026-11-26"},
+            headers=pmc_admin,
+        ).json()["id"]
+        client.patch(f"/api/v1/cleanups/{c4}/status", json={"status": "in_progress"}, headers=pmc_admin)
+        client.post(
+            f"/api/v1/cleanups/{c4}/evidence",
+            json={"afterImageUrl": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09", "notes": "Site spotless"},
+            headers=pmc_admin,
+        )
+        client.post(
+            f"/api/v1/cleanups/{c4}/verify",
+            json={"decision": "approve", "notes": "Certified 100% clean."},
+            headers=pmc_admin,
+        )
+
+        # R5: Rejected report (paper, 5kg)
+        r5 = create_report(
+            client, citizen, latitude=18.5040, longitude=73.9530, title="Litter pile 5",
+            extra={"category": "paper", "severity": "low", "estimatedKg": 5.0}
+        ).json()["id"]
+        client.patch(f"/api/v1/reports/{r5}/status", json={"status": "rejected"}, headers=pmc_admin)
+
+        # 3. Verify Database Metrics Match Exact DB Operations
+        m_resp = client.get("/api/v1/analytics/metrics", headers=pmc_admin)
+        assert m_resp.status_code == 200
+        m = m_resp.json()
+        assert m["totalReports"] == 5
+        assert m["pendingReports"] == 1
+        assert m["verifiedReports"] == 1
+        assert m["scheduledReports"] == 1
+        assert m["cleanedReports"] == 1
+        assert m["rejectedReports"] == 1
+
+        # Strict distinction between completed & verified cleanups
+        assert m["cleanupTasks"] == 2
+        assert m["completedCleanups"] == 1
+        assert m["verifiedCleanups"] == 1
+        assert m["inProgressCleanups"] == 1
+        assert m["pendingCleanups"] == 0
+
+        # Only cleaned reports contribute to total waste collected: 50.0 kg
+        assert m["totalWasteCollectedKg"] == 50.0
+
+        # Durations are positive numbers
+        assert m["averageCleanupCompletionTimeHours"] is not None
+        assert m["averageCleanupCompletionTimeHours"] >= 0.0
+
+        # 4. Verify Category Distribution: Accurate Counts & Sum to 100%
+        cat_resp = client.get("/api/v1/analytics/categories", headers=pmc_admin)
+        assert cat_resp.status_code == 200
+        cats = cat_resp.json()
+        total_cat_reports = sum(c["count"] for c in cats)
+        assert total_cat_reports == 5
+        total_percentage = round(sum(c["value"] for c in cats), 0)
+        assert total_percentage == 100.0
+
+        # Plastic should be 2 out of 5 = 40.0%
+        plastic_cat = next(c for c in cats if c["category"] == "plastic")
+        assert plastic_cat["count"] == 2
+        assert plastic_cat["value"] == 40.0
+        assert plastic_cat["estimatedKg"] == 60.0  # 10 + 50
+
+        # 5. Verify Monthly Reporting Trends
+        trends_resp = client.get("/api/v1/analytics/trends", headers=pmc_admin)
+        assert trends_resp.status_code == 200
+        monthly = trends_resp.json()
+        # Current month (last entry) should have 5 reports and 1 resolved
+        latest_month = monthly[-1]
+        assert latest_month["reports"] == 5
+        assert latest_month["resolved"] == 1
+        assert latest_month["cleanupsCreated"] == 2
+        assert latest_month["cleanupsCompleted"] == 1
+
+        # 6. Verify Cleanup Remediation Trends
+        ct_resp = client.get("/api/v1/analytics/cleanup-trends", headers=pmc_admin)
+        assert ct_resp.status_code == 200
+        ct_list = ct_resp.json()
+        latest_ct = ct_list[-1]
+        assert latest_ct["tasksCreated"] == 2
+        assert latest_ct["tasksVerified"] == 1
+
+        # 7. Verify Hotspot Distribution
+        hd_resp = client.get("/api/v1/analytics/hotspot-distribution", headers=pmc_admin)
+        assert hd_resp.status_code == 200
+        hd_data = hd_resp.json()
+        assert "totalHotspots" in hd_data
+        assert "priorityDistribution" in hd_data
+        assert len(hd_data["priorityDistribution"]) == 4
+
+        # 8. Verify Ward Stats
+        ward_resp = client.get("/api/v1/admin/ward-stats", headers=pmc_admin)
+        assert ward_resp.status_code == 200
+        ws = ward_resp.json()
+        assert len(ws) >= 1
+        total_ward_reports = sum(w["totalReports"] for w in ws)
+        assert total_ward_reports == 5
+
+        # 9. Verify Multi-Tenant Scoping (PCMC admin sees 0 PMC reports)
+        pcmc_metrics_resp = client.get("/api/v1/analytics/metrics", headers=pcmc_admin)
+        assert pcmc_metrics_resp.status_code == 200
+        pcmc_m = pcmc_metrics_resp.json()
+        assert pcmc_m["totalReports"] == 0
+        assert pcmc_m["cleanedReports"] == 0
+        assert pcmc_m["cleanupTasks"] == 0
+
+
+
 
 
 
