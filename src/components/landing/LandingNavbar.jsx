@@ -30,15 +30,9 @@ export function LandingNavbar() {
   }, []);
 
   const navLinks = [
-    { name: 'Home', hashId: 'hero' },
-    { name: 'About', hashId: 'about' },
-    { name: 'Our Mission', hashId: 'solution' },
-    { name: 'Capabilities', hashId: 'capabilities' },
-    { name: 'How It Works', hashId: 'how-it-works' },
-    { name: 'Pollution Map', hashId: 'gis-intelligence' },
-    { name: 'Hotspot Intel', hashId: 'hotspot-intel' },
-    { name: 'Technology', hashId: 'technology' },
-    { name: 'Impact', hashId: 'impact' },
+    { name: 'Product Briefing', hashId: 'overview' },
+    { name: 'Four Pillars', hashId: 'capabilities' },
+    { name: 'Stakeholders', hashId: 'audience' },
   ];
 
   const handleNavClick = (hashId, e) => {
@@ -111,7 +105,7 @@ export function LandingNavbar() {
             </Link>
 
             {/* Desktop Navigation Links (Pill Dock) */}
-            <nav className="hidden xl:flex items-center p-1.5 bg-[#102D27] rounded-full border border-[#23584E] shadow-inner space-x-1">
+            <nav className="hidden lg:flex items-center p-1.5 bg-[#102D27] rounded-full border border-[#23584E] shadow-inner space-x-1">
               {navLinks.map((link) => (
                 <a
                   key={link.name}
@@ -122,6 +116,19 @@ export function LandingNavbar() {
                   {link.name}
                 </a>
               ))}
+              <span className="text-[#23584E] px-1">•</span>
+              <Link
+                to="/map"
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 text-[#74D7CB] hover:text-white hover:bg-white/5 font-sans"
+              >
+                Live Map
+              </Link>
+              <Link
+                to="/report"
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 text-[#74D7CB] hover:text-white hover:bg-white/5 font-sans"
+              >
+                Report Waste
+              </Link>
             </nav>
 
             {/* Right Side Actions: Sign In & Launch Platform */}
@@ -193,6 +200,21 @@ export function LandingNavbar() {
                 {link.name}
               </a>
             ))}
+
+            <Link
+              to="/map"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3.5 py-2.5 rounded-xl text-sm font-bold text-[#74D7CB] hover:bg-white/5 transition-colors"
+            >
+              Live Pollution Map →
+            </Link>
+            <Link
+              to="/report"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3.5 py-2.5 rounded-xl text-sm font-bold text-[#74D7CB] hover:bg-white/5 transition-colors"
+            >
+              Report Waste Incident →
+            </Link>
 
             <div className="pt-3 border-t border-[#27403C] flex items-center gap-2">
               <Link
