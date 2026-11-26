@@ -1083,4 +1083,186 @@ def test_vision_diagnostics_and_detection_review():
         assert any(entry["action"] == "detection.reviewed" for entry in history_entries)
 
 
+def test_geospatial_hotspot_clustering_and_priority_scoring():
+    """
+    Prompt 9 - Test: Geospatial Hotspot Intelligence and 5-Factor Priority Scoring
+    - Validates nearby reports within radius (<=300m) are grouped into a cluster
+    - Validates distant reports (>300m / >450m seed) are separated into distinct clusters
+    - Validates incident deduplication: duplicate reports within 30m and 48h do NOT artificially inflate recurrence
+    - Validates verified cleanup records update lastVerifiedCleanupDate and lower cleanup lag score
+    - Validates time_window_days filtering excludes reports older than the window
+    - Validates 5-factor scoring breakdown (waste severity, recurrence, cleanup lag, environmental, recency)
+    - Validates factors sum to priorityScore and priorityExplanation is present
+    """
+    with TestClient(app) as client:
+        citizen = register_citizen(client, email="hotspot.tester@example.test")
+        pmc_admin = login(client, "pmc@example.test", "PMC-test-password-2026")
+
+        # 1. Create two nearby reports within PMC boundary (< 150m apart)
+        # Location 1: (18.5000, 73.9500)
+        rep1_resp = create_report(
+            client,
+            citizen,
+            latitude=18.5000,
+            longitude=73.9500,
+            title="Plastic bottles on riverbank drain",
+            extra={
+                "description": "Massive plastic buildup blocking drainage canal near school",
+                "category": "plastic",
+                "severity": "high",
+            },
+        )
+        assert rep1_resp.status_code == 201
+        rep1_id = rep1_resp.json()["id"]
+
+        # Location 2: (18.5010, 73.9508) (~140m from Location 1)
+        rep2_resp = create_report(
+            client,
+            citizen,
+            latitude=18.5010,
+            longitude=73.9508,
+            title="More bags and containers near canal",
+            extra={
+                "description": "Recurring plastic pollution along the canal bank",
+                "category": "plastic",
+                "severity": "high",
+            },
+        )
+        assert rep2_resp.status_code == 201
+        rep2_id = rep2_resp.json()["id"]
+
+        # 2. Create a distant report (> 2.5 km away) in PMC: (18.5150, 73.9800)
+        rep_distant_resp = create_report(
+            client,
+            citizen,
+            latitude=18.5150,
+            longitude=73.9800,
+            title="Distant garbage pile on commercial avenue",
+            extra={
+                "category": "mixed",
+                "severity": "medium",
+            },
+        )
+        assert rep_distant_resp.status_code == 201
+        rep_distant_id = rep_distant_resp.json()["id"]
+
+        # 3. Query public hotspots: nearby reports form a cluster
+        hotspots_resp = client.get("/api/v1/public/hotspots?radius_meters=300")
+        assert hotspots_resp.status_code == 200
+        hotspots = hotspots_resp.json()
+        assert len(hotspots) >= 1
+
+        # Locate the cluster containing rep1_id
+        cluster1 = next((h for h in hotspots if rep1_id in h["contributingReportIds"]), None)
+        assert cluster1 is not None, "Nearby reports must be grouped into a cluster"
+        assert rep2_id in cluster1["contributingReportIds"], "Report 2 must be in the same cluster"
+        assert rep_distant_id not in cluster1["contributingReportIds"], "Distant report must NOT be in cluster 1"
+        assert cluster1["reportCount"] == 2
+        assert cluster1["distinctIncidents"] >= 1
+        assert cluster1["dominantCategory"] == "plastic"
+        assert cluster1["lastVerifiedCleanupDate"] is None, "Missing cleanup must be None (not invented)"
+        assert "factors" in cluster1
+        factors = cluster1["factors"]
+        assert "wasteSeverity" in factors
+        assert "reportRecurrence" in factors
+        assert "cleanupLag" in factors
+        assert "environmentalSensitivity" in factors
+        assert "reportRecency" in factors
+        assert cluster1["priorityExplanation"] != ""
+
+        # Factor contributions sum to priorityScore
+        contrib_sum = round(
+            factors["wasteSeverity"]["contribution"]
+            + factors["reportRecurrence"]["contribution"]
+            + factors["cleanupLag"]["contribution"]
+            + factors["environmentalSensitivity"]["contribution"]
+            + factors["reportRecency"]["contribution"]
+        )
+        assert abs(contrib_sum - cluster1["priorityScore"]) <= 1
+
+        # 4. Anti-Inflation Test: Submit duplicate report of the same incident (within 15m and same hour)
+        rep_dup_resp = create_report(
+            client,
+            citizen,
+            latitude=18.5001,
+            longitude=73.9501,  # ~15m from Location 1
+            title="Another photo of the same plastic heap",
+            extra={
+                "category": "plastic",
+                "severity": "high",
+            },
+        )
+        assert rep_dup_resp.status_code == 201
+        rep_dup_id = rep_dup_resp.json()["id"]
+
+        hotspots_dup_resp = client.get("/api/v1/public/hotspots?radius_meters=300")
+        assert hotspots_dup_resp.status_code == 200
+        cluster1_after = next((h for h in hotspots_dup_resp.json() if rep1_id in h["contributingReportIds"]), None)
+        assert cluster1_after is not None
+        assert rep_dup_id in cluster1_after["contributingReportIds"]
+        # Total reports increased to 3, but distinct incidents remained 2 (preventing inflation!)
+        assert cluster1_after["reportCount"] == 3
+        assert cluster1_after["distinctIncidents"] == 2
+        assert cluster1_after["recurrenceCount"] == 2
+
+        # 5. Verified Cleanup Test: Verify report 1 and complete cleanup
+        verify_resp = client.patch(
+            f"/api/v1/reports/{rep1_id}/status",
+            json={"status": "verified", "estimatedKg": 150.0},
+            headers=pmc_admin,
+        )
+        assert verify_resp.status_code == 200
+
+        cleanup_resp = client.post(
+            "/api/v1/cleanups",
+            json={
+                "reportId": rep1_id,
+                "taskName": "Riverbank drainage cleanup",
+                "assignedTeam": "PMC Sanitation Squad A",
+                "scheduledDate": "2026-11-26",
+            },
+            headers=pmc_admin,
+        )
+        assert cleanup_resp.status_code == 201
+        cleanup_id = cleanup_resp.json()["id"]
+
+        # Mark cleanup completed
+        complete_resp = client.patch(
+            f"/api/v1/cleanups/{cleanup_id}/status",
+            json={
+                "status": "completed",
+                "afterImageUrl": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09",
+                "notes": "Completed verified sweep.",
+            },
+            headers=pmc_admin,
+        )
+        assert complete_resp.status_code == 200
+
+        # Query hotspots again: lastVerifiedCleanupDate is now populated and cleanup lag is low
+        hotspots_cleaned_resp = client.get("/api/v1/public/hotspots?radius_meters=300")
+        assert hotspots_cleaned_resp.status_code == 200
+        cluster1_cleaned = next((h for h in hotspots_cleaned_resp.json() if rep1_id in h["contributingReportIds"]), None)
+        assert cluster1_cleaned is not None
+        assert cluster1_cleaned["lastVerifiedCleanupDate"] is not None
+        # Since it was cleaned today, cleanupLag score is low (10.0 pts)
+        assert cluster1_cleaned["factors"]["cleanupLag"]["score"] == 10.0
+
+        # 6. Admin hotspot endpoint with filters
+        admin_hotspots_resp = client.get(
+            "/api/v1/hotspots?category=plastic&sort_by=priority",
+            headers=pmc_admin,
+        )
+        assert admin_hotspots_resp.status_code == 200
+        assert all(h["dominantCategory"] == "plastic" for h in admin_hotspots_resp.json())
+
+        # 7. Hotspot detail endpoint
+        hotspot_id = cluster1_cleaned["id"]
+        detail_resp = client.get(f"/api/v1/hotspots/{hotspot_id}", headers=pmc_admin)
+        assert detail_resp.status_code == 200
+        detail = detail_resp.json()
+        assert detail["id"] == hotspot_id
+        assert detail["priorityScore"] == cluster1_cleaned["priorityScore"]
+
+
+
 

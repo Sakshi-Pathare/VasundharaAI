@@ -529,72 +529,285 @@ def _distance_meters(left: Report, right: Report) -> float:
     return 6_371_000 * 2 * math.atan2(math.sqrt(value), math.sqrt(max(0, 1 - value)))
 
 
-def _hotspots(reports: list[Report], db: Session) -> list[dict]:
-    by_municipality: dict[str, list[Report]] = {}
-    for report in reports:
-        if report.jurisdiction_status == "assigned" and report.municipality_id:
-            by_municipality.setdefault(report.municipality_id, []).append(report)
+def _cluster_into_incidents(
+    reports: list[Report],
+    max_meters: float = 30.0,
+    max_hours: float = 48.0,
+) -> list[list[Report]]:
+    """
+    Groups reports of the same physical incident within a spatial radius (<=30m)
+    and time window (<=48h) to prevent duplicate citizen submissions from
+    artificially inflating recurrence scores.
+    """
+    if not reports:
+        return []
+    remaining = set(range(len(reports)))
+    incidents = []
+    while remaining:
+        seed = min(remaining)
+        remaining.remove(seed)
+        incident = [reports[seed]]
+        frontier = [seed]
+        while frontier:
+            curr_idx = frontier.pop()
+            curr_rep = reports[curr_idx]
+            curr_time = curr_rep.reported_at or utc_now()
+            curr_time_utc = curr_time.replace(tzinfo=timezone.utc) if curr_time.tzinfo is None else curr_time
 
-    clusters = []
-    for municipality_id, municipality_reports in by_municipality.items():
-        remaining = set(range(len(municipality_reports)))
+            candidates = []
+            for cand_idx in sorted(remaining):
+                cand_rep = reports[cand_idx]
+                cand_time = cand_rep.reported_at or utc_now()
+                cand_time_utc = cand_time.replace(tzinfo=timezone.utc) if cand_time.tzinfo is None else cand_time
+
+                dist = _distance_meters(curr_rep, cand_rep)
+                time_diff_hours = abs((curr_time_utc - cand_time_utc).total_seconds()) / 3600.0
+                if dist <= max_meters and time_diff_hours <= max_hours:
+                    candidates.append(cand_idx)
+
+            for cand_idx in candidates:
+                remaining.remove(cand_idx)
+                incident.append(reports[cand_idx])
+                frontier.append(cand_idx)
+        incidents.append(incident)
+    return incidents
+
+
+def _hotspots(
+    reports: list[Report],
+    db: Session,
+    *,
+    radius_meters: float = 300.0,
+    time_window_days: int | None = None,
+    municipality_id: str | None = None,
+    ward_id: str | None = None,
+    category: str | None = None,
+    severity: str | None = None,
+    min_priority: int | None = None,
+    min_reports: int = 2,
+) -> list[dict]:
+    now = utc_now()
+    filtered: list[Report] = []
+    for report in reports:
+        if report.is_archived:
+            continue
+        if report.status in {"rejected", "spam", "archived"}:
+            continue
+        if report.jurisdiction_status != "assigned" or not report.municipality_id:
+            continue
+        if municipality_id and report.municipality_id != municipality_id:
+            continue
+        if ward_id and report.ward_id != ward_id:
+            continue
+        if time_window_days is not None and time_window_days > 0:
+            rep_time = report.reported_at or now
+            rep_time_utc = rep_time.replace(tzinfo=timezone.utc) if rep_time.tzinfo is None else rep_time
+            if (now - rep_time_utc).days > time_window_days:
+                continue
+        filtered.append(report)
+
+    by_municipality: dict[str, list[Report]] = {}
+    for report in filtered:
+        by_municipality.setdefault(report.municipality_id, []).append(report)
+
+    clusters: list[tuple[str, list[Report]]] = []
+    max_seed_dist = radius_meters * 1.5
+
+    for m_id, m_reports in by_municipality.items():
+        remaining = set(range(len(m_reports)))
         while remaining:
             seed = min(remaining)
             remaining.remove(seed)
+            seed_report = m_reports[seed]
             cluster = {seed}
             frontier = [seed]
             while frontier:
                 current = frontier.pop()
                 neighbors = [
                     candidate for candidate in sorted(remaining)
-                    if _distance_meters(municipality_reports[current], municipality_reports[candidate]) <= 300
+                    if _distance_meters(m_reports[current], m_reports[candidate]) <= radius_meters
+                    and _distance_meters(seed_report, m_reports[candidate]) <= max_seed_dist
                 ]
                 for candidate in neighbors:
                     remaining.remove(candidate)
                     cluster.add(candidate)
                     frontier.append(candidate)
-            if len(cluster) >= 2:
-                clusters.append((municipality_id, [municipality_reports[index] for index in cluster]))
+            if len(cluster) >= min_reports:
+                clusters.append((m_id, [m_reports[index] for index in cluster]))
 
     clusters.sort(key=lambda group: (
         group[0],
         sum(report.latitude for report in group[1]) / len(group[1]),
         sum(report.longitude for report in group[1]) / len(group[1]),
     ))
+
     result = []
-    for index, (municipality_id, cluster) in enumerate(clusters, start=1):
-        municipality = db.get(Municipality, municipality_id)
+    for index, (m_id, cluster) in enumerate(clusters, start=1):
+        municipality = db.get(Municipality, m_id)
         latitude = sum(report.latitude for report in cluster) / len(cluster)
         longitude = sum(report.longitude for report in cluster) / len(cluster)
         categories = Counter(report.category for report in cluster)
-        severity_weight = {"low": 15, "medium": 35, "high": 55}
-        newest = max(report.reported_at or utc_now() for report in cluster)
-        oldest = min(report.reported_at or utc_now() for report in cluster)
+        dominant_cat = categories.most_common(1)[0][0]
+
+        ward_counts = Counter(report.ward_id for report in cluster if report.ward_id)
+        cluster_ward_id = ward_counts.most_common(1)[0][0] if ward_counts else None
+        cluster_ward_name = cluster_ward_id or "Unassigned"
+
+        contributing_ids = [report.id for report in cluster]
+        report_count = len(cluster)
+
+        # Incident Deduplication
+        incidents = _cluster_into_incidents(cluster, max_meters=30.0, max_hours=48.0)
+        distinct_incidents = len(incidents)
+
+        # Timestamps
+        newest = max(report.reported_at or now for report in cluster)
+        newest_utc = newest.replace(tzinfo=timezone.utc) if newest.tzinfo is None else newest
+        oldest = min(report.reported_at or now for report in cluster)
         oldest_utc = oldest.replace(tzinfo=timezone.utc) if oldest.tzinfo is None else oldest
-        elapsed_days = max(0, (utc_now() - oldest_utc).days)
-        average_severity = sum(severity_weight.get(report.severity, 25) for report in cluster) / len(cluster)
-        priority = min(100, round(
-            average_severity
-            + min(35, (len(cluster) - 1) * 12)
-            + max(0, 10 - elapsed_days // 7)
-        ))
+
+        # 1. Waste Severity (30%, weight 0.30)
+        sev_weights = {"critical": 100.0, "high": 85.0, "medium": 55.0, "low": 25.0}
+        s_sev = sum(sev_weights.get(report.severity, 55.0) for report in cluster) / len(cluster)
+        c_sev = round(0.30 * s_sev, 1)
+
+        # 2. Report Recurrence (25%, weight 0.25)
+        # Based on deduplicated distinct incident count
+        k = distinct_incidents
+        if k == 1:
+            s_rec = 20.0
+        elif k == 2:
+            s_rec = 45.0
+        elif k == 3:
+            s_rec = 70.0
+        elif k == 4:
+            s_rec = 85.0
+        else:
+            s_rec = min(100.0, 85.0 + (k - 4) * 5.0)
+        c_rec = round(0.25 * s_rec, 1)
+
+        # 3. Time Since Last Verified Cleanup (20%, weight 0.20)
+        cleanups = db.scalars(
+            select(Cleanup).where(
+                Cleanup.report_id.in_(contributing_ids),
+                Cleanup.status == "completed",
+            )
+        ).all()
+
+        if cleanups:
+            newest_cleanup = max(c.completed_at or c.created_at for c in cleanups)
+            newest_cleanup_utc = newest_cleanup.replace(tzinfo=timezone.utc) if newest_cleanup.tzinfo is None else newest_cleanup
+            last_verified_cleanup_date = newest_cleanup_utc.isoformat()
+            days_since_cleanup = max(0, (now - newest_cleanup_utc).days)
+            if days_since_cleanup <= 3:
+                s_clean = 10.0
+            elif days_since_cleanup <= 7:
+                s_clean = 25.0
+            elif days_since_cleanup <= 14:
+                s_clean = 50.0
+            elif days_since_cleanup <= 30:
+                s_clean = 75.0
+            else:
+                s_clean = min(100.0, 75.0 + (days_since_cleanup - 30) * 0.8)
+        else:
+            last_verified_cleanup_date = None
+            uncleaned_days = max(0, (now - oldest_utc).days)
+            s_clean = min(100.0, max(15.0, round(15.0 + min(85.0, uncleaned_days * 2.5), 1)))
+        c_clean = round(0.20 * s_clean, 1)
+
+        # 4. Environmental Sensitivity (15%, weight 0.15)
+        cat_risk = {
+            "hazardous": 95.0,
+            "electronic": 90.0,
+            "e-waste": 90.0,
+            "plastic": 75.0,
+            "construction": 65.0,
+            "glass": 55.0,
+            "metal": 50.0,
+            "organic": 45.0,
+            "paper": 30.0,
+            "cardboard": 30.0,
+        }
+        base_env = cat_risk.get(dominant_cat.lower(), 50.0)
+        keywords = {"drain", "nullah", "river", "lake", "canal", "water", "school", "hospital", "market", "park", "playground", "wetland"}
+        has_sensitive_asset = any(
+            any(kw in (r.address or "").lower() or kw in (r.description or "").lower() or kw in (r.title or "").lower() for kw in keywords)
+            for r in cluster
+        )
+        s_env = min(100.0, base_env + (15.0 if has_sensitive_asset else 0.0))
+        c_env = round(0.15 * s_env, 1)
+
+        # 5. Recency of Reports (10%, weight 0.10)
+        days_since_newest = max(0, (now - newest_utc).days)
+        if days_since_newest <= 1:
+            s_recent = 100.0
+        elif days_since_newest <= 3:
+            s_recent = 85.0
+        elif days_since_newest <= 7:
+            s_recent = 70.0
+        elif days_since_newest <= 14:
+            s_recent = 50.0
+        elif days_since_newest <= 30:
+            s_recent = 30.0
+        else:
+            s_recent = max(5.0, 30.0 - (days_since_newest - 30) * 0.5)
+        c_recent = round(0.10 * s_recent, 1)
+
+        # Overall Priority Score
+        priority_score = min(100, max(1, round(c_sev + c_rec + c_clean + c_env + c_recent)))
+        severity_label = "critical" if priority_score >= 80 else "high" if priority_score >= 60 else "medium" if priority_score >= 40 else "low"
+
+        # Filters
+        if category and category != "all" and dominant_cat != category:
+            continue
+        if severity and severity != "all" and severity_label != severity:
+            continue
+        if min_priority is not None and priority_score < min_priority:
+            continue
+
+        priority_explanation = (
+            f"Priority {priority_score}/100 ({severity_label}) driven by waste severity ({c_sev}/30, dominant {dominant_cat}) "
+            f"and {distinct_incidents} recurring incident(s) ({c_rec}/25). "
+            f"Cleanup lag contribution: {c_clean}/20. "
+            f"Environmental sensitivity: {c_env}/15. "
+            f"Report recency: {c_recent}/10."
+        )
+
         result.append({
-            "id": f"HOT-{municipality.code if municipality else municipality_id}-{index:03d}",
+            "id": f"HOT-{municipality.code if municipality else m_id}-{index:03d}",
             "name": f"Recurring litter cluster near {cluster[0].address or 'reported locations'}",
             "district": municipality.name if municipality else "Municipality",
-            "municipalityId": municipality_id,
-            "municipalityCode": municipality.code if municipality else municipality_id,
+            "municipality": municipality.name if municipality else "Municipality",
+            "municipalityId": m_id,
+            "municipalityCode": municipality.code if municipality else m_id,
+            "ward": cluster_ward_name,
+            "wardId": cluster_ward_id,
             "latitude": latitude,
             "longitude": longitude,
-            "radiusMeters": 300,
-            "recurrenceCount": len(cluster),
-            "severity": "high" if priority >= 70 else "medium" if priority >= 40 else "low",
-            "priorityScore": priority,
-            "dominantCategory": categories.most_common(1)[0][0],
-            "lastReportedDate": newest.isoformat(),
-            "trend": "Based on submitted reports",
-            "environmentalRisk": f"{len(cluster)} reports within 300 meters; assess drainage and public access.",
-            "suggestedAction": "Review this location and schedule a site inspection.",
+            "coordinates": [latitude, longitude],
+            "radiusMeters": round(radius_meters),
+            "reportCount": report_count,
+            "recurrenceCount": distinct_incidents,
+            "distinctIncidents": distinct_incidents,
+            "dominantCategory": dominant_cat,
+            "severity": severity_label,
+            "priorityScore": priority_score,
+            "latestReportDate": newest_utc.isoformat(),
+            "lastReportedDate": newest_utc.isoformat(),
+            "oldestReportDate": oldest_utc.isoformat(),
+            "lastVerifiedCleanupDate": last_verified_cleanup_date,
+            "contributingReportIds": contributing_ids,
+            "factors": {
+                "wasteSeverity": {"score": round(s_sev, 1), "weight": 0.30, "contribution": c_sev},
+                "reportRecurrence": {"score": round(s_rec, 1), "weight": 0.25, "contribution": c_rec},
+                "cleanupLag": {"score": round(s_clean, 1), "weight": 0.20, "contribution": c_clean},
+                "environmentalSensitivity": {"score": round(s_env, 1), "weight": 0.15, "contribution": c_env},
+                "reportRecency": {"score": round(s_recent, 1), "weight": 0.10, "contribution": c_recent},
+            },
+            "priorityExplanation": priority_explanation,
+            "trend": f"{distinct_incidents} incident(s) across {report_count} report(s)",
+            "environmentalRisk": f"{report_count} reports clustered within {round(radius_meters)}m; {dominant_cat} hazard rating: {s_env:.0f}/100.",
+            "suggestedAction": "Deploy immediate sanitation dispatch and anti-dumping surveillance." if priority_score >= 60 else "Routine monitoring and scheduled collection.",
         })
     return result
 
@@ -819,19 +1032,39 @@ def public_reports(
 
 @api.get("/public/hotspots")
 def public_hotspots(
-    sort_by: Literal["priority", "recurrence", "date"] = Query(default="priority"),
+    sort_by: Literal["priority", "recurrence", "date", "severity"] = Query(default="priority"),
+    time_window_days: int | None = Query(default=None),
+    radius_meters: float = Query(default=300.0, ge=50.0, le=2000.0),
+    municipality_id: str | None = Query(default=None),
+    ward_id: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    min_priority: int | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
     reports = db.scalars(select(Report).where(
         Report.jurisdiction_status == "assigned",
         Report.municipality_id.is_not(None),
+        Report.is_archived.is_(False),
     ).order_by(Report.reported_at.desc())).all()
+    hotspots = _hotspots(
+        reports,
+        db,
+        radius_meters=radius_meters,
+        time_window_days=time_window_days,
+        municipality_id=municipality_id,
+        ward_id=ward_id,
+        category=category,
+        severity=severity,
+        min_priority=min_priority,
+    )
     sort_key = {
         "priority": lambda item: item["priorityScore"],
         "recurrence": lambda item: item["recurrenceCount"],
-        "date": lambda item: item["lastReportedDate"],
+        "date": lambda item: item["latestReportDate"],
+        "severity": lambda item: item["priorityScore"],
     }[sort_by]
-    return sorted(_hotspots(reports, db), key=sort_key, reverse=True)
+    return sorted(hotspots, key=sort_key, reverse=True)
 
 
 @api.post("/reports", status_code=201)
@@ -1315,16 +1548,35 @@ def assign_cleanup(
 
 @api.get("/hotspots")
 def list_admin_hotspots(
-    sort_by: Literal["priority", "recurrence", "date"] = Query(default="priority"),
+    sort_by: Literal["priority", "recurrence", "date", "severity"] = Query(default="priority"),
+    time_window_days: int | None = Query(default=None),
+    radius_meters: float = Query(default=300.0, ge=50.0, le=2000.0),
+    municipality_id: str | None = Query(default=None),
+    ward_id: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    min_priority: int | None = Query(default=None),
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     _require_scoped_permission(user, "analytics:read")
-    hotspots = _hotspots(_scoped_reports(db, user), db)
+    reports = _scoped_reports(db, user)
+    hotspots = _hotspots(
+        reports,
+        db,
+        radius_meters=radius_meters,
+        time_window_days=time_window_days,
+        municipality_id=municipality_id,
+        ward_id=ward_id,
+        category=category,
+        severity=severity,
+        min_priority=min_priority,
+    )
     sort_key = {
         "priority": lambda item: item["priorityScore"],
         "recurrence": lambda item: item["recurrenceCount"],
-        "date": lambda item: item["lastReportedDate"],
+        "date": lambda item: item["latestReportDate"],
+        "severity": lambda item: item["priorityScore"],
     }[sort_by]
     return sorted(hotspots, key=sort_key, reverse=True)
 

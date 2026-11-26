@@ -8,27 +8,57 @@ import { api, getAuthToken } from './apiClient.js';
 
 export const hotspotService = {
   /**
-   * Retrieves hotspot clusters.
+   * Retrieves hotspot clusters with configurable query parameters and filters.
    * Uses tenant-scoped /hotspots when authenticated as municipal admin;
    * otherwise uses public clustered /public/hotspots.
    */
-  async getHotspots(sortBy = 'priority') {
-    const validSort = ['priority', 'recurrence', 'date'].includes(sortBy) ? sortBy : 'priority';
+  async getHotspots(options = 'priority') {
+    const params = typeof options === 'string' ? { sortBy: options } : (options || {});
+    const query = new URLSearchParams();
+
+    const validSort = ['priority', 'recurrence', 'date', 'severity'].includes(params.sortBy)
+      ? params.sortBy
+      : 'priority';
+    query.set('sort_by', validSort);
+
+    if (params.timeWindowDays && Number(params.timeWindowDays) > 0) {
+      query.set('time_window_days', String(params.timeWindowDays));
+    }
+    if (params.radiusMeters && Number(params.radiusMeters) > 0) {
+      query.set('radius_meters', String(params.radiusMeters));
+    }
+    if (params.municipalityId && params.municipalityId !== 'all') {
+      query.set('municipality_id', params.municipalityId);
+    }
+    if (params.wardId && params.wardId !== 'all') {
+      query.set('ward_id', params.wardId);
+    }
+    if (params.category && params.category !== 'all') {
+      query.set('category', params.category);
+    }
+    if (params.severity && params.severity !== 'all') {
+      query.set('severity', params.severity);
+    }
+    if (params.minPriority && Number(params.minPriority) > 0) {
+      query.set('min_priority', String(params.minPriority));
+    }
+
+    const qs = query.toString() ? `?${query.toString()}` : '';
     const token = getAuthToken();
     let data;
 
     if (token) {
       try {
-        data = await api.get(`/hotspots?sort_by=${validSort}`);
+        data = await api.get(`/hotspots${qs}`);
       } catch (err) {
         if (err.isForbidden) {
-          data = await api.get(`/public/hotspots?sort_by=${validSort}`);
+          data = await api.get(`/public/hotspots${qs}`);
         } else {
           throw err;
         }
       }
     } else {
-      data = await api.get(`/public/hotspots?sort_by=${validSort}`);
+      data = await api.get(`/public/hotspots${qs}`);
     }
 
     if (!Array.isArray(data)) return [];

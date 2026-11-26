@@ -27,7 +27,6 @@ import { EmptyState } from '../components/common/EmptyState';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { reportService } from '../services/reportService';
 import { hotspotService } from '../services/hotspotService';
-import { cityPresets, initialMockHotspots } from '../data/mockHotspots';
 import { getSeverityBadgeProps, getStatusBadgeProps, getCategoryLabel } from '../utils/formatters';
 import { formatDate, formatRelativeTime } from '../utils/dateUtils';
 import { Globe, Plus } from 'lucide-react';
@@ -75,31 +74,23 @@ export function PollutionMapPage() {
     }
   };
 
-  const handleCitySwitch = async (cityKey) => {
+  const handleCitySwitch = (cityKey) => {
     setActiveCity(cityKey);
     let coords = [18.5204, 73.8567];
-    let presetHotspots = initialMockHotspots;
 
     if (cityKey === 'pune') {
       coords = [18.5204, 73.8567];
-      presetHotspots = cityPresets.pune || initialMockHotspots;
     } else if (cityKey === 'mumbai') {
       coords = [19.0760, 72.8777];
-      presetHotspots = cityPresets.mumbai || initialMockHotspots;
     } else if (cityKey === 'nagpur') {
       coords = [21.1458, 79.0882];
-      presetHotspots = cityPresets.nagpur || initialMockHotspots;
     } else if (cityKey === 'nashik') {
       coords = [19.9975, 73.7898];
-      presetHotspots = cityPresets.nashik || initialMockHotspots;
     } else if (cityKey === 'delhi') {
       coords = [28.6139, 77.2090];
-      presetHotspots = cityPresets.delhi || initialMockHotspots;
     }
 
     setMapCenter(coords);
-    await hotspotService.loadPreset(presetHotspots);
-    setHotspots(presetHotspots);
   };
 
   const highSeverityCount = reports.filter(r => r.severity === 'high' || r.severity === 'critical').length;
