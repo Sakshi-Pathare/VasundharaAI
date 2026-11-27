@@ -1,6 +1,6 @@
 # Cleanup Operations and Evidence Verification Workflow
 
-This document specifies the complete cleanup management and photographic evidence verification lifecycle implemented in EcoWatch AI, connecting citizen litter reports, municipal administrators, and field cleanup operations squads.
+This document specifies the complete cleanup management and photographic evidence verification lifecycle implemented in Vasundhara AI, connecting citizen litter reports, municipal administrators, and field cleanup operations squads.
 
 ---
 

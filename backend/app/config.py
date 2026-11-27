@@ -20,7 +20,7 @@ class Settings:
         self.log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
 
         # Database URL (defaults to local SQLite with WAL mode enabled)
-        default_sqlite = f"sqlite:///{(BACKEND_DIR / 'ecowatch.db').as_posix()}"
+        default_sqlite = f"sqlite:///{(BACKEND_DIR / 'vasundhara.db').as_posix()}"
         self.database_url: str = os.getenv("DATABASE_URL", default_sqlite)
 
         # CORS Configuration
@@ -41,8 +41,8 @@ class Settings:
         self.max_image_bytes: int = int(os.getenv("MAX_IMAGE_BYTES", str(8 * 1024 * 1024)))
 
         # Super Admin Initial Bootstrap Credentials
-        self.superadmin_email: str = os.getenv("ECOWATCH_SUPERADMIN_EMAIL", "")
-        self.superadmin_password: str = os.getenv("ECOWATCH_SUPERADMIN_PASSWORD", "")
+        self.superadmin_email: str = os.getenv("VASUNDHARA_SUPERADMIN_EMAIL") or os.getenv("ECOWATCH_SUPERADMIN_EMAIL", "")
+        self.superadmin_password: str = os.getenv("VASUNDHARA_SUPERADMIN_PASSWORD") or os.getenv("ECOWATCH_SUPERADMIN_PASSWORD", "")
 
         # Geospatial & ML Settings
         self.boundary_margin_meters: float = float(

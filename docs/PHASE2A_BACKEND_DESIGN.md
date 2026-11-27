@@ -1,4 +1,4 @@
-# Vasundhara AI (formerly EcoWatch AI) — Phase 2A: Backend Foundation & Architecture Design
+# Vasundhara AI (formerly Vasundhara AI) — Phase 2A: Backend Foundation & Architecture Design
 
 > **Document:** `PHASE2A_BACKEND_DESIGN.md`  
 > **Date:** November 12, 2026  
@@ -17,7 +17,7 @@ A repository safety check was conducted before outlining the backend architectur
 - **Commits on Record:**
   - `90860ba`: Ignore `.vite` cache directory.
   - `7f520c9`: Merge remote repository `origin/main`.
-  - `bf3e70e`: Initial commit: EcoWatch AI platform foundation (46 files).
+  - `bf3e70e`: Initial commit: Vasundhara AI platform foundation (46 files).
   - `7660e3d`: Initial commit (README.md).
 - **Working Tree Integrity:**
   - Modified files in working tree represent the completed Phase 1 stabilization adjustments (`ImageUploader.jsx`, `LocationPickerMap.jsx`, `reportService.js`, `cleanupService.js`, etc.).
@@ -361,13 +361,13 @@ pip install fastapi uvicorn[standard] sqlalchemy psycopg2-binary geoalchemy2 ale
 Start-Service -Name "postgresql-x64-18"
 
 # Or if using Docker for PostGIS:
-docker run --name ecowatch-postgis -e POSTGRES_DB=ecowatch_db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=ecowatch_secure -p 5432:5432 -d postgis/postgis:16-3.4
+docker run --name vasundhara-postgis -e POSTGRES_DB=vasundhara_db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=ecowatch_secure -p 5432:5432 -d postgis/postgis:16-3.4
 ```
 
 ### Step 5: Run Alembic Database Migrations
 ```powershell
 alembic init alembic
-alembic revision --autogenerate -m "Initial EcoWatch schema with PostGIS"
+alembic revision --autogenerate -m "Initial Vasundhara AI schema with PostGIS"
 alembic upgrade head
 ```
 

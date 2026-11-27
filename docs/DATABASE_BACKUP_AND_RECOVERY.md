@@ -1,4 +1,4 @@
-# EcoWatch AI / Vasundhara AI — Database Backup & Recovery Guide
+# Vasundhara AI — Database Backup & Recovery Guide
 
 This operational manual documents zero-downtime, non-blocking database backup, verification, and disaster-recovery procedures for **Vasundhara AI**.
 
@@ -32,30 +32,30 @@ python -m app.backup create
 ```
 *Output:*
 ```text
-[INFO] vasundhara_ai: Initiating online SQLite hot backup from .../ecowatch.db to .../ecowatch_backup_20261127_041422.db...
+[INFO] vasundhara_ai: Initiating online SQLite hot backup from .../vasundhara.db to .../vasundhara_backup_20261127_041422.db...
 [INFO] vasundhara_ai: Online backup page copy completed successfully.
 [INFO] vasundhara_ai: Backup integrity check verified: status OK.
-[INFO] vasundhara_ai: Compressed backup generated: .../ecowatch_backup_20261127_041422.db.gz
-Backup created: backend/backups/ecowatch_backup_20261127_041422.db.gz
+[INFO] vasundhara_ai: Compressed backup generated: .../vasundhara_backup_20261127_041422.db.gz
+Backup created: backend/backups/vasundhara_backup_20261127_041422.db.gz
 ```
 
 ### Verify an Existing Backup Archive
 ```powershell
 $env:PYTHONPATH='backend'
-python -m app.backup verify --file 'backend/backups/ecowatch_backup_20261127_041422.db.gz'
+python -m app.backup verify --file 'backend/backups/vasundhara_backup_20261127_041422.db.gz'
 ```
 *Output:*
 ```text
-[INFO] vasundhara_ai: Backup archive ecowatch_backup_20261127_041422.db.gz verified intact.
+[INFO] vasundhara_ai: Backup archive vasundhara_backup_20261127_041422.db.gz verified intact.
 Verification OK
 ```
 
 ### Restore from a Backup Archive
 ```powershell
 $env:PYTHONPATH='backend'
-python -m app.backup restore --file 'backend/backups/ecowatch_backup_20261127_041422.db.gz'
+python -m app.backup restore --file 'backend/backups/vasundhara_backup_20261127_041422.db.gz'
 ```
-*Safety Feature*: Before replacing the active database, the restore tool automatically snapshots the current database to `ecowatch.db.pre_restore_<timestamp>`.
+*Safety Feature*: Before replacing the active database, the restore tool automatically snapshots the current database to `vasundhara.db.pre_restore_<timestamp>`.
 
 ---
 

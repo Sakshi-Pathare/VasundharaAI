@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — End-to-End Automated & Manual QA Test Report
+# Vasundhara AI — End-to-End Automated & Manual QA Test Report
 
 **Document Revision:** 1.0.0  
 **Test Execution Date:** 2026-11-27  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-A comprehensive quality assurance gate was executed across the full **Vasundhara AI** (EcoWatch AI) environmental intelligence platform. The testing scope evaluated the complete lifecycle:
+A comprehensive quality assurance gate was executed across the full **Vasundhara AI** (Vasundhara AI) environmental intelligence platform. The testing scope evaluated the complete lifecycle:
 1. **Citizen Experience:** Account registration, secure login, photographic evidence validation, interactive GPS map coordinate selection, AI triage fallback, and incident submission.
 2. **Municipal Administration:** Spatial jurisdiction routing into Pune Municipal Corporation (PMC) and Pimpri Chinchwad Municipal Corporation (PCMC) boundaries, multi-tenant RBAC isolation, evidence review, and report status verification.
 3. **Geospatial Hotspot Intelligence:** Spatial accumulation clustering, incident deduplication (30m spatial radius / 48h temporal window), and transparent 5-factor priority calculation.
@@ -39,7 +39,7 @@ A comprehensive quality assurance gate was executed across the full **Vasundhara
 
 | Test ID | Scenario Description | Expected Result | Actual Result | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **TC-AUTH-01** | Citizen self-registration with strong password (`alex.citizen@ecowatch.test`) | HTTP 201 Created, bcrypt hash stored in DB, JWT access token returned. | Status 201, valid bearer token issued with `role: citizen`. | **PASSED** |
+| **TC-AUTH-01** | Citizen self-registration with strong password (`alex.citizen@vasundhara.test`) | HTTP 201 Created, bcrypt hash stored in DB, JWT access token returned. | Status 201, valid bearer token issued with `role: citizen`. | **PASSED** |
 | **TC-AUTH-02** | Password complexity enforcement (<8 chars, missing uppercase, missing numbers) | HTTP 422 Unprocessable Content with specific validation message. | Status 422 rejected with schema violation details. | **PASSED** |
 | **TC-AUTH-03** | Rapid brute-force login attempts (Rate Limiting) | Account lockout / HTTP 429 Too Many Requests after 5 invalid attempts. | Status 429 triggered with retry cooldown interval. | **PASSED** |
 | **TC-AUTH-04** | Session logout and token invalidation | HTTP 204 No Content, token record marked revoked in `auth_sessions`. | Status 204, subsequent requests with old token return HTTP 401. | **PASSED** |
@@ -104,7 +104,7 @@ A native browser automation run was executed using **Google Chrome (v158.0.8127.
 --- STAGE 1: Citizen Context ---
 [1.1] Navigating to /login
 [1.2] Switching to Registration Mode
-[1.3] Registering citizen: citizen.e2e.1795758044@ecowatch.test
+[1.3] Registering citizen: citizen.e2e.1795758044@vasundhara.test
 [1.3] Registration successful! Current URL: http://localhost:3000/dashboard
 [1.4] Navigating to /report
 [1.5] Attaching photographic evidence

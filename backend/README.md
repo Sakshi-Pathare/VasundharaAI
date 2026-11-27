@@ -13,14 +13,14 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
-SQLite is the default database and is created at `backend/ecowatch.db`. The API creates its tables on startup. Interactive API documentation is available at `http://localhost:8001/docs`; `http://localhost:8001/health` is the health check.
+SQLite is the default database and is created at `backend/vasundhara.db`. The API creates its tables on startup. Interactive API documentation is available at `http://localhost:8001/docs`; `http://localhost:8001/health` is the health check.
 
-Copy `.env.example` to `.env` to configure the database, CORS origins, or optional model path. Before the first startup, set `ECOWATCH_SUPERADMIN_EMAIL` and `ECOWATCH_SUPERADMIN_PASSWORD` in `.env`; the password must be at least 12 characters. The application bootstraps that account once and does not provide default credentials. Environment variables already set by the shell take precedence.
+Copy `.env.example` to `.env` to configure the database, CORS origins, or optional model path. Before the first startup, set `VASUNDHARA_SUPERADMIN_EMAIL` and `VASUNDHARA_SUPERADMIN_PASSWORD` in `.env`; the password must be at least 12 characters. The application bootstraps that account once and does not provide default credentials. Environment variables already set by the shell take precedence.
 
 To use PostgreSQL, set `DATABASE_URL` before starting the API, for example:
 
 ```powershell
-$env:DATABASE_URL = "postgresql+psycopg://postgres:your-password@localhost:5432/ecowatch"
+$env:DATABASE_URL = "postgresql+psycopg://postgres:your-password@localhost:5432/vasundhara"
 ```
 
 The database must already exist. The application creates its tables automatically.

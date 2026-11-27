@@ -18,7 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-logger = logging.getLogger("ecowatch.vision")
+logger = logging.getLogger("vasundhara.vision")
 
 # Standardized waste taxonomy mapped to municipal disposal streams
 # Based on TACO (Trash Annotations in Context) core classes

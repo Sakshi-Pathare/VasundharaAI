@@ -31,7 +31,7 @@
 - **Component:** `backend/app/database.py`
 - **Root Cause:**
   - `backend/.env` does not exist by default; only `backend/.env.example` is tracked.
-  - When no `DATABASE_URL` is configured, `database.py` defaults to `sqlite:///backend/ecowatch.db`.
+  - When no `DATABASE_URL` is configured, `database.py` defaults to `sqlite:///backend/vasundhara.db`.
   - On Windows OneDrive directories, SQLite file locks can experience latency or collisions if accessed across multiple asynchronous threads.
 - **Resolution Plan:** Provide an automated script/command to copy `.env.example` to `.env` on first setup and set SQLite `timeout=30` and WAL mode (`journal_mode=WAL`) when running locally on SQLite.
 
@@ -42,7 +42,7 @@
 ### DEBT-001: Token Storage & Authentication State Synchronization
 - **Component:** `src/contexts/AuthContext.jsx` vs `src/services/apiClient.js`
 - **Issue:**
-  - `src/services/apiClient.js` stores the Bearer JWT in `sessionStorage` (`ecowatch_access_token_v1`).
+  - `src/services/apiClient.js` stores the Bearer JWT in `sessionStorage` (`vasundhara_access_token_v1`).
   - `src/contexts/AuthContext.jsx` stores current user metadata in `localStorage` (`vasundhara_current_user_v2`).
 - **Remediation:** Standardize on consistent session management: store Bearer token in secure storage, validate on app mount via `GET /api/v1/auth/me`, and clear both simultaneously on `logout()`.
 

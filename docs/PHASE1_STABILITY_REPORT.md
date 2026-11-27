@@ -1,8 +1,8 @@
-# Vasundhara AI (formerly EcoWatch AI) — Phase 1 Stability & Completion Report
+# Vasundhara AI (formerly Vasundhara AI) — Phase 1 Stability & Completion Report
 
 > **Date:** November 12, 2026  
 > **Phase:** Phase 1 — Application Stability & Existing Feature Completion  
-> **Repository:** [Sakshi-Pathare/EcoWatchAI](https://github.com/Sakshi-Pathare/EcoWatchAI)  
+> **Repository:** [Sakshi-Pathare/VasundharaAI](https://github.com/Sakshi-Pathare/VasundharaAI)  
 > **Build Status:** **PASSING (Vite v5.4.21, 0 errors, 0 warnings)**  
 > **Test Suite:** **10 Passed, 0 Failed**  
 > **Git Preservation:** All original teammate designs and functionality preserved. No Git resets or remote pushes.
@@ -39,7 +39,7 @@ All 6 primary objectives were completed, verified, and validated through an auto
 - **Implemented Fixes:**
   1. **New Storage Utility ([src/utils/imageStorage.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/utils/imageStorage.js)):**
      - **Client-Side Canvas Compression (`compressImageFile`):** Dynamically scales uploaded photos down to a maximum bounding box of 1200×1200 at 72% JPEG quality. Converts 5–15MB camera files into lightweight ~60–140KB images (92%–97% storage savings).
-     - **Browser IndexedDB Store (`saveImageToIndexedDB`, `getImageFromIndexedDB`, `deleteImageFromIndexedDB`):** Implemented an IndexedDB database (`ecowatch_media_db`, store `images`) allowing hundreds of megabytes of media storage without touching `localStorage` limits.
+     - **Browser IndexedDB Store (`saveImageToIndexedDB`, `getImageFromIndexedDB`, `deleteImageFromIndexedDB`):** Implemented an IndexedDB database (`vasundhara_media_db`, store `images`) allowing hundreds of megabytes of media storage without touching `localStorage` limits.
      - **Quota Preservation Fallback:** In [reportService.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/services/reportService.js), if `localStorage` write ever fails due to tight quota, data URLs are stripped from localStorage because they are safely stored in IndexedDB.
   2. **Enhanced Uploader ([src/components/forms/ImageUploader.jsx](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/components/forms/ImageUploader.jsx)):**
      - Added asynchronous compression loading state (`Loader2` spinner with *"Compressing & Optimizing Image..."*).
@@ -52,7 +52,7 @@ All 6 primary objectives were completed, verified, and validated through an auto
 - **Issues Identified in Audit:**
   - [reportService.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/services/reportService.js) lacked a `deleteReport` method, making it impossible to remove submissions.
 - **Implemented Fixes:**
-  - **Create:** `createReport(reportData)` generates unique `REP-XXXX` IDs, stores photos in IndexedDB, and prepends to `ecowatch_reports_v1`.
+  - **Create:** `createReport(reportData)` generates unique `REP-XXXX` IDs, stores photos in IndexedDB, and prepends to `vasundhara_reports_v1`.
   - **Read:** `getAllReports(filters)` and `getReportById(id)` enrich missing images from IndexedDB asynchronously.
   - **Update:** `updateReportStatus(id, newStatus)` updates statuses across the platform.
   - **Delete:** Added `deleteReport(id)` to [reportService.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/services/reportService.js), removing records from `localStorage` and purging binary assets from IndexedDB.

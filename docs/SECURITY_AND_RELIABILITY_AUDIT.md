@@ -1,4 +1,4 @@
-# EcoWatch AI / Vasundhara AI — Security, Validation and Reliability Audit
+# Vasundhara AI — Security, Validation and Reliability Audit
 
 **Document Version**: 2.0.0  
 **Audit Conducted**: 2026-11-27  
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-A comprehensive application security and reliability audit was conducted across the **EcoWatch AI / Vasundhara AI** environmental intelligence platform. The audit identified, remediated, and verified key controls spanning authentication, authorization, multi-tenant isolation, file upload validation, structured telemetry, and fault tolerance.
+A comprehensive application security and reliability audit was conducted across the **Vasundhara AI** environmental intelligence platform. The audit identified, remediated, and verified key controls spanning authentication, authorization, multi-tenant isolation, file upload validation, structured telemetry, and fault tolerance.
 
 ### Summary of Controls & Posture
 | Control Domain | Status | Verification Mechanism |

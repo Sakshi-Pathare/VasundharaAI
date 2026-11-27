@@ -1,6 +1,6 @@
 # Vasundhara AI — Frontend–Backend Integration Matrix
 
-**Project:** Vasundhara AI (EcoWatch AI)  
+**Project:** Vasundhara AI  
 **Version:** 2.0.0 (Architecture Stabilization & Full Integration)  
 **Date:** November 2026  
 **Status:** Complete & Verified  
@@ -38,7 +38,7 @@
 | **Complete Cleanup Task** (`CleanupManagementPage.jsx`) | `cleanupService.updateTaskStatus(id, 'completed', afterImg, notes)` | `PATCH /api/v1/cleanups/{id}/status` | `{ status: "completed", afterImageUrl, notes }` | `{ id, status: "completed", afterImageUrl, ... }` | Validates `afterImageUrl` is present. `UPDATE cleanups SET status = 'completed'`. Linked `reports` status set to `cleaned`. | Moves card to completed column, triggers "Before & After" photo verification view. |
 | **Municipal Operational Notes** (`AdminDashboard.jsx`) | `reportService.updateInternalNotes(id, note)` | `PATCH /api/v1/reports/{id}/notes` | `{ note: string }` | `{ id, internalNotes, ... }` | `UPDATE reports SET internal_notes = :note WHERE id = :id`. | Displays saved internal notes for municipal teams. |
 | **Delete Illegal / Duplicate Report** (`AdminDashboard.jsx`) | `reportService.deleteReport(id)` | `DELETE /api/v1/reports/{id}` | None (Admin Bearer) | `{ success: true, message: "Report deleted" }` | Soft-deletes or removes record, ensuring cleanup references cascade safely. | Removes row from triage table, updates metrics. |
-| **CSV Export** (`AdminDashboard.jsx`) | `reportService.exportReportsCsv()` | `GET /api/v1/reports/export.csv` | None (Admin Bearer) | Text stream (`text/csv` with UTF-8 BOM) | `SELECT * FROM reports WHERE municipality_id = :admin_mun` | Triggers browser download of `ecowatch_reports_YYYY-MM-DD.csv`. |
+| **CSV Export** (`AdminDashboard.jsx`) | `reportService.exportReportsCsv()` | `GET /api/v1/reports/export.csv` | None (Admin Bearer) | Text stream (`text/csv` with UTF-8 BOM) | `SELECT * FROM reports WHERE municipality_id = :admin_mun` | Triggers browser download of `vasundhara_reports_YYYY-MM-DD.csv`. |
 | **Executive Metrics & KPIs** (`AdminDashboard.jsx`, `UserDashboard.jsx`) | `analyticsService.getDashboardMetrics()` | `GET /api/v1/analytics/metrics` or `/public/metrics` | None | `{ totalReports, pendingReports, verifiedReports, completedCleanups, totalWasteKg }` | SQL aggregation queries across `reports` and `cleanups`. | Updates KPI metric widgets, trends, and progress bars. |
 | **Trends & Category Charts** (`AdminDashboard.jsx`) | `analyticsService.getPollutionTrends()`, `getCategoryBreakdown()` | `GET /api/v1/analytics/trends`, `GET /api/v1/analytics/categories` | None | Time series points and categorical slices | SQL `GROUP BY date(created_at)` and `GROUP BY category`. | Recharts AreaChart (weekly trend) and PieChart (waste breakdown). |
 | **Municipal Ward Statistics** (`AdminDashboard.jsx`, `SuperAdminPage.jsx`) | `analyticsService.getWardStats()` | `GET /api/v1/admin/ward-stats` | None (Admin Bearer) | `List[{ wardId, totalReports, resolvedReports, pendingReports, hotnessScore }]` | SQL `GROUP BY ward_id` join with boundaries. | Renders ward priority leaderboard. |

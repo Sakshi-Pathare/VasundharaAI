@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — System Architecture
+# Vasundhara AI — System Architecture
 
 **Document Version:** 2.0.0  
 **Classification:** Technical Architecture Specification  

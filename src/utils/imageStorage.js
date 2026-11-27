@@ -6,7 +6,7 @@
  * 3. Falling back safely to lightweight Data URLs if IndexedDB is unavailable.
  */
 
-const DB_NAME = 'ecowatch_media_db';
+const DB_NAME = 'vasundhara_media_db';
 const STORE_NAME = 'images';
 const DB_VERSION = 1;
 

@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — Master Codebase Audit
+# Vasundhara AI — Master Codebase Audit
 **Authoritative Architectural Report**  
 **Date:** November 2026 | **Version:** 2.1.0  
 **Status:** Architecture Stabilized & Duplicate Trees Resolved
@@ -7,7 +7,7 @@
 
 ## 1. Executive Summary
 
-Vasundhara AI (formerly EcoWatch AI) is a sovereign smart-city environmental monitoring and municipal litter intelligence platform. It provides civic crowdsourced litter reporting, YOLO-assisted image diagnostics, interactive Leaflet/OSM geospatial cartography, automated recurrence hotspot calculation, isolated municipal dispatch workflows, and verified before-and-after remediation audits.
+Vasundhara AI (formerly Vasundhara AI) is a sovereign smart-city environmental monitoring and municipal litter intelligence platform. It provides civic crowdsourced litter reporting, YOLO-assisted image diagnostics, interactive Leaflet/OSM geospatial cartography, automated recurrence hotspot calculation, isolated municipal dispatch workflows, and verified before-and-after remediation audits.
 
 This audit establishes the **authoritative codebase baseline**, eliminates conflicting duplicate directory trees, documents the state of all frontend and backend services, assesses security and data flow, and establishes the blueprint for production PostgreSQL and FastAPI integration.
 
@@ -16,14 +16,14 @@ This audit establishes the **authoritative codebase baseline**, eliminates confl
 ## 2. Directory Structure & Authoritative Trees
 
 ### 2.1 Redundant Tree Resolution
-Previously, the repository contained a redundant root directory called `EcoWatchAI-main/` which mirrored parts of the project with outdated components and caused developer confusion.
+Previously, the repository contained a redundant root directory called `VasundharaAI-legacy/` which mirrored parts of the project with outdated components and caused developer confusion.
 
 - **Authoritative React Frontend:** Root `/src`
   - Houses the full 12-section long-scrolling public landing website (`/`), the operational application portal (`/app`), dark-green navigation/footer theme, and unified Maharashtra telemetry datasets.
   - Preserved and integrated `SuperAdminPage.jsx`, `superAdminService.js`, and `ApiConnectionNotice.jsx` into the root.
 - **Authoritative FastAPI Backend:** Root `/backend`
   - Contains all SQLAlchemy models (`models.py`), FastAPI route definitions (`api.py`), jurisdiction & boundary ray-casting algorithms (`jurisdiction.py`), security & session management (`security.py`), and YOLO detection hooks (`vision.py`).
-- **Resolution:** `EcoWatchAI-main/` has been completely purged from the repository after migrating unique assets into root `/src` and `/docs`.
+- **Resolution:** `VasundharaAI-legacy/` has been completely purged from the repository after migrating unique assets into root `/src` and `/docs`.
 
 ```
 evs-final/
@@ -100,7 +100,7 @@ evs-final/
 - **Client Service Layer:**
   - `src/services/apiClient.js`: Configured for `/api/v1` with Vite proxy to `http://localhost:8001`.
   - Currently, frontend services (`reportService.js`, `cleanupService.js`, `hotspotService.js`, `analyticsService.js`, `authService.js`) operate against local browser caches (`localStorage` and `IndexedDB`) with simulated network roundtrips.
-  - `EcoWatchAI-main` contained direct fetch calls to the FastAPI endpoints; this service layer must be unified and connected to the backend with robust connection retry logic.
+  - `VasundharaAI-legacy` contained direct fetch calls to the FastAPI endpoints; this service layer must be unified and connected to the backend with robust connection retry logic.
 
 ### 4.2 Backend Architecture & Multi-Tenancy
 - **Jurisdiction & Territorial Isolation:**

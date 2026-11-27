@@ -1,5 +1,5 @@
 """
-Vasundhara AI / EcoWatch AI — Enterprise Database Backup & Recovery Utility
+Vasundhara AI — Enterprise Database Backup & Recovery Utility
 
 Provides zero-downtime, non-blocking backups for:
 - SQLite (using online backup API with WAL mode integrity checks)
@@ -31,11 +31,11 @@ def create_backup(target_dir: Path | None = None) -> Path:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     if settings.is_sqlite:
-        db_file = BACKEND_DIR / "ecowatch.db"
+        db_file = BACKEND_DIR / "vasundhara.db"
         if not db_file.exists():
             raise FileNotFoundError(f"Source database file not found at {db_file}")
 
-        backup_file = dest_dir / f"ecowatch_backup_{timestamp}.db"
+        backup_file = dest_dir / f"vasundhara_backup_{timestamp}.db"
         logger.info(f"Initiating online SQLite hot backup from {db_file} to {backup_file}...")
 
         # Open source in read-only URI mode and target in write mode
@@ -60,7 +60,7 @@ def create_backup(target_dir: Path | None = None) -> Path:
             dest_conn.close()
 
         # Compress to .gz to save disk space
-        gz_file = dest_dir / f"ecowatch_backup_{timestamp}.db.gz"
+        gz_file = dest_dir / f"vasundhara_backup_{timestamp}.db.gz"
         with open(backup_file, "rb") as f_in, gzip.open(gz_file, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
         backup_file.unlink()  # Remove uncompressed temp copy
@@ -104,7 +104,7 @@ def restore_backup(backup_gz_path: Path, target_db_path: Path | None = None) -> 
     if not verify_backup(backup_gz_path):
         raise ValueError("Cannot restore from corrupted or invalid backup file.")
 
-    dest = target_db_path or (BACKEND_DIR / "ecowatch.db")
+    dest = target_db_path or (BACKEND_DIR / "vasundhara.db")
     logger.info(f"Restoring backup {backup_gz_path} to {dest}...")
 
     # Create safety snapshot of current active DB if it exists

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Vasundhara AI (EcoWatch AI) — Hardened Production Docker Compose
+# Vasundhara AI — Hardened Production Docker Compose
 # Architecture:
 # - Frontend: Nginx on 80/443 (Only service publicly exposed)
 # - Backend: Uvicorn ASGI on internal network only (no exposed ports)
@@ -54,8 +54,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       UPLOAD_DIR: /app/uploads
       MAX_IMAGE_BYTES: 8388608
-      ECOWATCH_SUPERADMIN_EMAIL: ${ECOWATCH_SUPERADMIN_EMAIL}
-      ECOWATCH_SUPERADMIN_PASSWORD: ${ECOWATCH_SUPERADMIN_PASSWORD}
+      VASUNDHARA_SUPERADMIN_EMAIL: ${VASUNDHARA_SUPERADMIN_EMAIL:-${ECOWATCH_SUPERADMIN_EMAIL}}
+      VASUNDHARA_SUPERADMIN_PASSWORD: ${VASUNDHARA_SUPERADMIN_PASSWORD:-${ECOWATCH_SUPERADMIN_PASSWORD}}
       LOG_LEVEL: INFO
     volumes:
       - uploads_prod:/app/uploads

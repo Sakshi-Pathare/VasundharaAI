@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — Database Schema Specification
+# Vasundhara AI — Database Schema Specification
 
 **Document Version:** 2.0.0  
 **Supported Engines:** PostgreSQL 15+ (Production) | SQLite 3.38+ with WAL Mode (Development & Testing)  

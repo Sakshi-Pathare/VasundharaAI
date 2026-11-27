@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — Known Limitations & System Boundaries
+# Vasundhara AI — Known Limitations & System Boundaries
 
 **Document Version:** 2.0.0  
 **Status:** Engineering Transparency & Technical Disclosure  

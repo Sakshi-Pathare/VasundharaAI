@@ -7,7 +7,7 @@ This roadmap defines the precise sequence of engineering operations required to 
 ## Phase 1: Codebase Audit & Baseline Stabilization [COMPLETED]
 - [x] Inspect all frontend components, routes, and services.
 - [x] Inspect FastAPI routes, models, security, and tests.
-- [x] Compare duplicate trees (`root` vs `EcoWatchAI-main`).
+- [x] Compare duplicate trees (`root` vs `VasundharaAI-legacy`).
 - [x] Verify passing backend pytest suite (9/9 passed).
 - [x] Verify production Vite frontend build (`npm run build`).
 - [x] Generate master codebase audit, implementation matrix, and known bugs inventory.
@@ -19,7 +19,7 @@ This roadmap defines the precise sequence of engineering operations required to 
 - [x] Establish root `/backend` as the sole authoritative FastAPI backend.
 - [x] Migrate `SuperAdminPage.jsx`, `superAdminService.js`, and `ApiConnectionNotice.jsx` into root `/src`.
 - [x] Archive previous design specifications into `docs/`.
-- [x] Purge redundant `EcoWatchAI-main/` directory from repository.
+- [x] Purge redundant `VasundharaAI-legacy/` directory from repository.
 - [x] Author comprehensive `docs/ARCHITECTURE.md`.
 
 ---

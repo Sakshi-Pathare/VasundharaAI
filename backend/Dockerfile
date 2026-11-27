@@ -1,5 +1,5 @@
 # ==============================================================================
-# Vasundhara AI (EcoWatch AI) — Backend Production Dockerfile
+# Vasundhara AI — Backend Production Dockerfile
 # Multi-stage, non-root, hardened Python ASGI container
 # ==============================================================================
 

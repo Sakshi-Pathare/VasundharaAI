@@ -1,11 +1,11 @@
-# EcoWatch AI / Vasundhara AI — User Experience & Interface Refinements
+# Vasundhara AI — User Experience & Interface Refinements
 
 This document records the user experience and accessibility architecture enhancements implemented under **Prompt 12: Professional User Experience and Interface Refinement**.
 
 ---
 
 ## 1. Design Language & Civic-Tech Philosophy
-The visual system adheres strictly to the existing **EcoWatch AI / Vasundhara AI** botanical design language:
+The visual system adheres strictly to the existing **Vasundhara AI** botanical design language:
 - **Palette**: Deep forest green (`#092421`, `#10241B`), soft botanical pista accents (`#74D7CB`, `#DEF5F1`), sage structural borders (`#E5EDE5`), and crisp warm paper card surfaces.
 - **Tone**: Purpose-driven civic-tech dashboard prioritizing data density, clarity, and rapid field decision-making without gratuitous animations or distraction.
 

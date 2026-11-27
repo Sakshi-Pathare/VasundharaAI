@@ -140,13 +140,13 @@ def user_json(user: User, municipality_name: str | None = None) -> dict:
 
 
 def bootstrap_super_admin(db: Session) -> None:
-    email = os.getenv("ECOWATCH_SUPERADMIN_EMAIL", "").strip().lower()
-    password = os.getenv("ECOWATCH_SUPERADMIN_PASSWORD", "")
+    email = (os.getenv("VASUNDHARA_SUPERADMIN_EMAIL") or os.getenv("ECOWATCH_SUPERADMIN_EMAIL", "")).strip().lower()
+    password = os.getenv("VASUNDHARA_SUPERADMIN_PASSWORD") or os.getenv("ECOWATCH_SUPERADMIN_PASSWORD", "")
     if not email and not password:
         return
     if not email or len(password) < 12:
         raise RuntimeError(
-            "Set both ECOWATCH_SUPERADMIN_EMAIL and ECOWATCH_SUPERADMIN_PASSWORD; "
+            "Set both VASUNDHARA_SUPERADMIN_EMAIL and VASUNDHARA_SUPERADMIN_PASSWORD; "
             "the password must contain at least 12 characters."
         )
 

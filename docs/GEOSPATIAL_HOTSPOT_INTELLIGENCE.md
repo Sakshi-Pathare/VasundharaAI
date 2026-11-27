@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-EcoWatch AI identifies geographic zones where civic litter repeatedly accumulates, computes geometric cluster centroids, deduplicates multi-citizen incident reports to prevent artificial score inflation, and calculates a transparent, deterministic **5-Factor Priority Score** normalized to a $0 - 100$ scale.
+Vasundhara AI identifies geographic zones where civic litter repeatedly accumulates, computes geometric cluster centroids, deduplicates multi-citizen incident reports to prevent artificial score inflation, and calculates a transparent, deterministic **5-Factor Priority Score** normalized to a $0 - 100$ scale.
 
 This document describes:
 1. Spatial clustering algorithms and evaluation of single-linkage connected-component clustering.
@@ -30,7 +30,7 @@ In pure single-linkage clustering:
 All five reports merge into a single connected component even though report $A$ and report $E$ are $1,000\text{m}$ apart ($> 3 \times R$). In dense urban corridors or along linear avenues, this produces "snake clusters" that chain across multiple distinct municipal wards, distorting the geometric centroid and generating an unmanageably large operational buffer.
 
 ### 2.3 The Seed-Distance Guard Solution
-To prevent single-linkage chaining while preserving legitimate neighborhood clustering around street corners and adjacent alleyways, EcoWatch AI enforces a **centroid-distance guard** during cluster frontier expansion:
+To prevent single-linkage chaining while preserving legitimate neighborhood clustering around street corners and adjacent alleyways, Vasundhara AI enforces a **centroid-distance guard** during cluster frontier expansion:
 $$\text{Candidate } c \text{ is merged into cluster with seed } s \iff d(u, c) \le R \;\land\; d(s, c) \le 1.5 \times R$$
 
 With $R = 300\text{m}$:

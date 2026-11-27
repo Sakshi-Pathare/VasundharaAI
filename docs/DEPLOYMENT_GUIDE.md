@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — Production Deployment Guide
+# Vasundhara AI — Production Deployment Guide
 
 **Target Environment:** Linux (Ubuntu 22.04 LTS / Debian 12 / RHEL 9)  
 **Deployment Model:** Containerized Micro-services via Docker & Docker Compose  
@@ -54,7 +54,7 @@ sudo ufw enable
 
 ### Step 1: Clone Repository
 ```bash
-git clone https://github.com/vasundhara-ai/ecowatch-ai.git /opt/vasundhara-ai
+git clone https://github.com/vasundhara-ai/vasundhara-ai.git /opt/vasundhara-ai
 cd /opt/vasundhara-ai
 ```
 
@@ -72,9 +72,9 @@ POSTGRES_DB=vasundhara_prod
 POSTGRES_USER=vasundhara_user
 POSTGRES_PASSWORD=${DB_PASS}
 DATABASE_URL=postgresql+psycopg://vasundhara_user:${DB_PASS}@db:5432/vasundhara_prod
-CORS_ORIGINS=https://ecowatch.yourdomain.org
-ECOWATCH_SUPERADMIN_EMAIL=superadmin@yourdomain.org
-ECOWATCH_SUPERADMIN_PASSWORD=${ADMIN_PASS}
+CORS_ORIGINS=https://vasundhara.yourdomain.org
+VASUNDHARA_SUPERADMIN_EMAIL=superadmin@yourdomain.org
+VASUNDHARA_SUPERADMIN_PASSWORD=${ADMIN_PASS}
 UPLOAD_DIR=/app/uploads
 MAX_IMAGE_BYTES=8388608
 LOG_LEVEL=INFO
@@ -112,11 +112,11 @@ sudo apt install -y certbot python3-certbot-nginx
 
 # 2. Stop host container temporarily to bind port 80/443 for standalone issuance
 docker compose -f docker-compose.prod.yml stop frontend
-sudo certbot certonly --standalone -d ecowatch.yourdomain.org
+sudo certbot certonly --standalone -d vasundhara.yourdomain.org
 
 # 3. Mount certificates into nginx container in docker-compose.prod.yml:
-# - /etc/letsencrypt/live/ecowatch.yourdomain.org/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
-# - /etc/letsencrypt/live/ecowatch.yourdomain.org/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
+# - /etc/letsencrypt/live/vasundhara.yourdomain.org/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+# - /etc/letsencrypt/live/vasundhara.yourdomain.org/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
 
 # 4. Restart stack
 docker compose -f docker-compose.prod.yml start frontend

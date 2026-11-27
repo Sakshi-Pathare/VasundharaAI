@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — Computer Vision & AI Model Documentation
+# Vasundhara AI — Computer Vision & AI Model Documentation
 
 **Document Version:** 2.0.0  
 **Engine:** Ultralytics YOLOv8 / PyTorch Architecture  

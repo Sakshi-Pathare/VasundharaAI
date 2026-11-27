@@ -1,7 +1,7 @@
-# Vasundhara AI (formerly EcoWatch AI) — Complete Project Readiness & Technical Audit
+# Vasundhara AI (formerly Vasundhara AI) — Complete Project Readiness & Technical Audit
 
 > **Audit Date:** November 12, 2026  
-> **Repository:** [Sakshi-Pathare/EcoWatchAI](https://github.com/Sakshi-Pathare/EcoWatchAI)  
+> **Repository:** [Sakshi-Pathare/VasundharaAI](https://github.com/Sakshi-Pathare/VasundharaAI)  
 > **Active Branch:** `main` | **Target Remote:** `origin/main` (Commit: `90860ba`)  
 > **Auditor Status:** Team Member Onboarding & Verification  
 > **Code Integrity Guarantee:** 100% Read-Only / Zero Teammate Modifications. Application source code and Git history remain strictly untouched.
@@ -36,7 +36,7 @@ Running `npm audit` against the official npm advisory registry identified **4 vu
 | :--- | :--- | :--- | :--- | :--- |
 | **esbuild** (`<=0.24.2`) | Moderate | [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99) | In development mode, `esbuild` can allow local network sites to send requests to the dev server and read responses. | Requires upgrading to `vite@8.x` (major breaking change). Safe to ignore for local academic prototyping. **Do not run `npm audit fix --force`**. |
 | **react-router** (`6.0.0 - 7.17.0`) | Moderate | [GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6) | Open redirect vulnerability via backslash in `<Link>` and `useNavigate` (CVE-2025-68470 bypass). | Requires upgrading to `react-router-dom@7.x`. Upgrading from v6 to v7 is a breaking change that would break existing route configs. Maintain v6 for now. |
-| **react-router** (`6.0.0 - 7.17.0`) | Moderate / High | [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg) | Arbitrary Constructor Injection via `deserializeErrors()` in React Router SSR Hydration. | Does **not** affect EcoWatch AI because this project is a purely client-rendered SPA without SSR hydration. |
+| **react-router** (`6.0.0 - 7.17.0`) | Moderate / High | [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg) | Arbitrary Constructor Injection via `deserializeErrors()` in React Router SSR Hydration. | Does **not** affect Vasundhara AI because this project is a purely client-rendered SPA without SSR hydration. |
 
 > **IMPORTANT WARNING:** Running `npm audit fix --force` will forcefully upgrade Vite to v8 and React Router to v7, which will introduce **breaking API changes** and crash your teammates' code. These packages must remain on their current stable versions for development.
 
@@ -183,13 +183,13 @@ pie title Feature Implementation Breakdown
   - Sets `API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'`.
   - Configured with `const USE_MOCK = true;` to simulate network round-trip.
 - **[reportService.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/services/reportService.js):**
-  - Manages `ecowatch_reports_v1` in `localStorage`.
+  - Manages `vasundhara_reports_v1` in `localStorage`.
   - Handles filters, creation, status updates, and user report querying.
 - **[hotspotService.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/services/hotspotService.js):**
-  - Manages `ecowatch_hotspots_v1` in `localStorage`.
+  - Manages `vasundhara_hotspots_v1` in `localStorage`.
   - Implements sorting algorithms (`priority`, `recurrence`, `date`).
 - **[cleanupService.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/services/cleanupService.js):**
-  - Manages `ecowatch_cleanups_v1` in `localStorage`.
+  - Manages `vasundhara_cleanups_v1` in `localStorage`.
   - Handles task status transitions and crew assignments.
 - **[analyticsService.js](file:///c:/Users/Varsharani/Downloads/2ND%20YEAR/evs%20final%20project/src/services/analyticsService.js):**
   - Combines report counts from `reportService` with mock metrics from `mockAnalytics.js`.
@@ -214,7 +214,7 @@ pie title Feature Implementation Breakdown
 
 ## 10. Prioritized Development Roadmap
 
-To bring EcoWatch AI from a prototype to a full, presentation-ready platform, the remaining tasks are structured in 4 distinct phases:
+To bring Vasundhara AI from a prototype to a full, presentation-ready platform, the remaining tasks are structured in 4 distinct phases:
 
 ```mermaid
 graph TD

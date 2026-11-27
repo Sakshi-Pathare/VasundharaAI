@@ -1,6 +1,6 @@
 # Computer Vision & YOLO Litter Detection Architecture
 
-This document provides a comprehensive technical assessment, dataset recommendation, architecture specification, evaluation protocol, and limitation disclosure for **EcoWatch AI**'s computer vision capabilities.
+This document provides a comprehensive technical assessment, dataset recommendation, architecture specification, evaluation protocol, and limitation disclosure for **Vasundhara AI**'s computer vision capabilities.
 
 ---
 
@@ -18,7 +18,7 @@ A thorough inspection of the repository and runtime environment was performed:
 
 ### 1.2 Strict Truthfulness & Non-Fabrication Policy
 In compliance with engineering standards:
-- **No fake detection results**: EcoWatch AI never returns hardcoded or synthetic bounding boxes as genuine inferences.
+- **No fake detection results**: Vasundhara AI never returns hardcoded or synthetic bounding boxes as genuine inferences.
 - **No fabricated accuracy metrics**: The system does not claim unvalidated precision, recall, or mAP scores.
 - **No automated weight claims**: Visual object detection cannot measure physical mass. Estimated waste weight is solely an input parameter or calibrated volumetric heuristic, never claimed as a 2D camera measurement.
 - **Honest fallback disclosure**: If `YOLO_MODEL_PATH` is unconfigured or unavailable, the backend reports `aiStatus: "unavailable"`, documents the blocker, and preserves manual citizen/supervisor classifications.

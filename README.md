@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — Environmental Intelligence Platform
+# Vasundhara AI — Environmental Intelligence Platform
 
 [![CI/CD Quality Gate](https://img.shields.io/badge/Quality%20Gate-PASSED%20(100%25)-emerald.svg)](#testing-and-verification)
 [![Python Version](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://python.org)
@@ -6,7 +6,7 @@
 [![React](https://img.shields.io/badge/React-18.3-61dafb.svg)](https://react.dev)
 [![Docker Ready](https://img.shields.io/badge/Docker-Multi--Stage%20Hardened-2496ed.svg)](docs/DEPLOYMENT_GUIDE.md)
 
-Vasundhara AI (EcoWatch AI) is an enterprise-grade civic environmental intelligence web platform designed to empower citizens, municipal corporations, and remediation contractors in identifying public litter, recording precise geographic coordinates, clustering recurring pollution hotspots, and executing verified cleanup operations.
+Vasundhara AI is an enterprise-grade civic environmental intelligence web platform designed to empower citizens, municipal corporations, and remediation contractors in identifying public litter, recording precise geographic coordinates, clustering recurring pollution hotspots, and executing verified cleanup operations.
 
 Built with **FastAPI**, **React 18**, **PostgreSQL / SQLite (WAL)**, **Leaflet GIS**, and **YOLOv8 Computer Vision**, the application features strict multi-tenant boundary isolation across municipal jurisdictions (such as Pune Municipal Corporation and Pimpri Chinchwad Municipal Corporation).
 

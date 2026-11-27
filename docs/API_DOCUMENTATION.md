@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — API Reference Documentation
+# Vasundhara AI — API Reference Documentation
 
 **API Version:** 2.0.0  
 **Base URL:** `/api/v1`  

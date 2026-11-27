@@ -1,6 +1,6 @@
 """
 Prompt 14 — Automated End-to-End QA Testing Suite
-Validates the complete EcoWatch AI / Vasundhara AI lifecycle:
+Validates the complete Vasundhara AI lifecycle:
 - Citizen registration & login
 - Photographic evidence upload & coordinates validation
 - Automatic jurisdiction routing & database persistence
@@ -143,7 +143,7 @@ TINY_JPEG_B64 = "data:image/jpeg;base64," + base64.b64encode(TINY_JPEG).decode("
 def test_e2e_complete_citizen_to_cleanup_to_analytics_lifecycle():
     """
     E2E Test Scenario:
-    1. Register Citizen ('alex.citizen@ecowatch.test')
+    1. Register Citizen ('alex.citizen@vasundhara.test')
     2. Citizen logs in and authenticates
     3. Citizen uploads photographic evidence
     4. Citizen selects GPS location in Shivajinagar, PMC (18.5300, 73.8500)
@@ -164,7 +164,7 @@ def test_e2e_complete_citizen_to_cleanup_to_analytics_lifecycle():
         # STEP 1 & 2: Citizen Registration & Login
         reg_resp = client.post("/api/v1/auth/register", json={
             "name": "Alex Citizen Steward",
-            "email": "alex.citizen@ecowatch.test",
+            "email": "alex.citizen@vasundhara.test",
             "phone": "+91-9876543210",
             "password": "StewardPassword2026!",
         })
@@ -175,7 +175,7 @@ def test_e2e_complete_citizen_to_cleanup_to_analytics_lifecycle():
         # Verify authenticated identity
         me_resp = client.get("/api/v1/auth/me", headers=citizen_headers)
         assert me_resp.status_code == 200
-        assert me_resp.json()["email"] == "alex.citizen@ecowatch.test"
+        assert me_resp.json()["email"] == "alex.citizen@vasundhara.test"
         assert me_resp.json()["role"] == "citizen"
 
         # STEP 3 & 4: Upload Image & Submit Report at PMC coordinates
@@ -337,7 +337,7 @@ def test_e2e_edge_cases_and_adversarial_scenarios():
         # Scenario 2: Register citizen and attempt unsupported file upload
         reg = client.post("/api/v1/auth/register", json={
             "name": "Audit User",
-            "email": "audit.adversary@ecowatch.test",
+            "email": "audit.adversary@vasundhara.test",
             "password": "ValidPassword123!",
         })
         citizen_headers = {"Authorization": f"Bearer {reg.json()['accessToken']}"}

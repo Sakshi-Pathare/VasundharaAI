@@ -1,4 +1,4 @@
-# Vasundhara AI (EcoWatch AI) — Comprehensive User Manual
+# Vasundhara AI — Comprehensive User Manual
 
 **Document Version:** 2.0.0  
 **Target Audiences:** Citizen Stewards, Municipal Sanitation Officials, Cleanup Squads, Super Administrators  

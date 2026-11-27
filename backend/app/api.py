@@ -1391,7 +1391,7 @@ def export_admin_reports(
             report.reported_at.isoformat() if report.reported_at else "",
         ])
     municipality = db.get(Municipality, user.municipality_id) if user.municipality_id else None
-    file_name = f"ecowatch-{municipality.code if municipality else 'platform'}-reports.csv"
+    file_name = f"vasundhara-{municipality.code if municipality else 'platform'}-reports.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",

@@ -1,12 +1,12 @@
 # Security Architecture and Role-Based Access Control (RBAC)
 
-This document outlines the authentication, authorization, multi-tenant isolation, password policy, and rate-limiting infrastructure for **EcoWatch AI**.
+This document outlines the authentication, authorization, multi-tenant isolation, password policy, and rate-limiting infrastructure for **Vasundhara AI**.
 
 ---
 
 ## 1. User Roles & Permission Hierarchy
 
-EcoWatch AI implements a strict hierarchical role-based access model with three primary actor roles:
+Vasundhara AI implements a strict hierarchical role-based access model with three primary actor roles:
 
 | Role | Scope | Permitted Capabilities |
 | :--- | :--- | :--- |
@@ -37,7 +37,7 @@ All registration (`POST /auth/register`) and admin user creation (`POST /superad
 
 ## 3. Rate Limiting
 
-EcoWatch AI includes a memory-efficient sliding-window rate limiter (`backend/app/rate_limiter.py`):
+Vasundhara AI includes a memory-efficient sliding-window rate limiter (`backend/app/rate_limiter.py`):
 
 - **Login Attempts**: Limited to **5 failed attempts per 60 seconds** per IP/email.
 - **Registration Requests**: Limited to **10 requests per 60 seconds** per IP.

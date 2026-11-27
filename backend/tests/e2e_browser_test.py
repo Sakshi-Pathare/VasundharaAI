@@ -51,7 +51,7 @@ def run_browser_e2e():
             c_page.wait_for_selector("#register-name", timeout=5000)
 
             # 1.3 Register a unique Citizen
-            unique_email = f"citizen.e2e.{int(time.time())}@ecowatch.test"
+            unique_email = f"citizen.e2e.{int(time.time())}@vasundhara.test"
             print(f"[1.3] Registering citizen: {unique_email}")
             c_page.fill("#register-name", "Priya Kulkarni")
             c_page.fill("#auth-email", unique_email)

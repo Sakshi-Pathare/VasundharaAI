@@ -1,7 +1,7 @@
 """
 Prompt 15 — Performance Benchmarking and Telemetry Script
 Empirically measures and records actual latency, query duration,
-bundle sizes, and throughput across the EcoWatch AI stack.
+bundle sizes, and throughput across the Vasundhara AI stack.
 """
 
 import os
@@ -23,7 +23,7 @@ TINY_JPEG_B64 = "data:image/jpeg;base64," + base64.b64encode(TINY_JPEG).decode("
 
 def benchmark_suite():
     print("=" * 70)
-    print("      ECOWATCH AI / VASUNDHARA AI EMPIRICAL BENCHMARK SUITE       ")
+    print("      VASUNDHARA AI EMPIRICAL BENCHMARK SUITE       ")
     print("=" * 70)
 
     client = TestClient(app)

@@ -53,10 +53,10 @@ Vasundhara AI uses a decoupled client-server architecture:
 | `ENVIRONMENT` | `development` | Environment tier: `development`, `testing`, or `production`. |
 | `API_HOST` | `0.0.0.0` | IP binding address for Uvicorn server. |
 | `API_PORT` | `8001` | Port number for Uvicorn server. |
-| `DATABASE_URL` | `sqlite:///backend/ecowatch.db` | SQLAlchemy connection string. SQLite uses Write-Ahead Logging (WAL) and 30s timeout automatically. Use `postgresql+psycopg://...` for production. |
+| `DATABASE_URL` | `sqlite:///backend/vasundhara.db` | SQLAlchemy connection string. SQLite uses Write-Ahead Logging (WAL) and 30s timeout automatically. Use `postgresql+psycopg://...` for production. |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173` | Comma-separated list of allowed origins. |
-| `ECOWATCH_SUPERADMIN_EMAIL` | *(optional)* | Email for initial platform super-administrator bootstrap. |
-| `ECOWATCH_SUPERADMIN_PASSWORD` | *(optional)* | Password for initial superadmin (minimum 12 characters). |
+| `VASUNDHARA_SUPERADMIN_EMAIL` | *(optional)* | Email for initial platform super-administrator bootstrap. |
+| `VASUNDHARA_SUPERADMIN_PASSWORD` | *(optional)* | Password for initial superadmin (minimum 12 characters). |
 | `UPLOAD_DIR` | `backend/uploads` | Path for uploaded photographic evidence. |
 | `MAX_IMAGE_BYTES` | `8388608` | Maximum allowable upload file size (8 MB). |
 | `LOG_LEVEL` | `INFO` | Python logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |

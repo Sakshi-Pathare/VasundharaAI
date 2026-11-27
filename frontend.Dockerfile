@@ -1,5 +1,5 @@
 # ==============================================================================
-# Vasundhara AI (EcoWatch AI) — Frontend Production Dockerfile
+# Vasundhara AI — Frontend Production Dockerfile
 # Multi-stage, high-performance static SPA with Nginx reverse proxy
 # ==============================================================================
 
