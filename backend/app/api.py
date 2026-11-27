@@ -2015,16 +2015,18 @@ def get_admin_hotspot(
 def get_analytics_metrics(
     time_range: str | None = Query(default=None),
     ward_id: str | None = Query(default=None),
+    wardId: str | None = Query(default=None),
     municipality_id: str | None = Query(default=None),
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     _require_scoped_permission(user, "analytics:read")
     reports = _scoped_reports(db, user)
+    effective_ward = ward_id or wardId
     if municipality_id and user.role == "super_admin":
         reports = [r for r in reports if r.municipality_id == municipality_id]
-    if ward_id and ward_id != "all":
-        reports = [r for r in reports if r.ward_id == ward_id]
+    if effective_ward and effective_ward != "all":
+        reports = [r for r in reports if r.ward_id == effective_ward]
     reports = _filter_reports_by_range(reports, time_range)
     return _metrics(reports, _cleanup_rows_for_reports(db, reports), db)
 
@@ -2033,13 +2035,15 @@ def get_analytics_metrics(
 def get_analytics_trends(
     time_range: str | None = Query(default=None),
     ward_id: str | None = Query(default=None),
+    wardId: str | None = Query(default=None),
     user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     _require_scoped_permission(user, "analytics:read")
     reports = _scoped_reports(db, user)
-    if ward_id and ward_id != "all":
-        reports = [r for r in reports if r.ward_id == ward_id]
+    effective_ward = ward_id or wardId
+    if effective_ward and effective_ward != "all":
+        reports = [r for r in reports if r.ward_id == effective_ward]
     
     # 6-month monthly trends
     now = utc_now()
