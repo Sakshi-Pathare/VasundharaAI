@@ -347,12 +347,21 @@ export function InteractiveMap({
               <Popup className="custom-report-popup">
                 <div className="w-72 overflow-hidden rounded-2xl text-left font-sans">
                   {report.imageUrl && (
-                    <div className="h-36 w-full overflow-hidden relative bg-sage-100">
+                    <div className="h-36 w-full overflow-hidden relative bg-[#E5EDE5]">
                       <img
                         src={report.imageUrl}
                         alt={report.title}
                         className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.parentElement.querySelector('.popup-img-fallback');
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
                       />
+                      <div className="popup-img-fallback hidden w-full h-full bg-gradient-to-br from-[#10241B] to-[#1B4332] flex-col items-center justify-center p-3 text-center select-none text-white">
+                        <span className="text-xs font-black text-[#DEF5F1]">{report.category}</span>
+                        <span className="text-[10px] text-[#74D7CB] font-mono mt-0.5">{report.id}</span>
+                      </div>
                       <span
                         className={`absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border shadow-xs ${sevProps.bg}`}
                       >

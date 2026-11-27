@@ -110,6 +110,12 @@ def migrate_existing_schema():
                 if column_name not in columns:
                     logger.info(f"Adding missing column '{column_name}' to 'reports' table")
                     connection.execute(text(f"ALTER TABLE reports ADD COLUMN {column_name} {definition}"))
+            # Upgrade image_url column to TEXT for Base64 Data URI persistence in PostgreSQL
+            if engine.dialect.name == "postgresql":
+                try:
+                    connection.execute(text("ALTER TABLE reports ALTER COLUMN image_url TYPE TEXT;"))
+                except Exception as exc:
+                    logger.warning(f"Could not alter reports.image_url type: {exc}")
 
     if "cleanups" in table_names:
         cleanup_cols = {column["name"] for column in inspect(engine).get_columns("cleanups")}
@@ -127,3 +133,10 @@ def migrate_existing_schema():
                 if column_name not in cleanup_cols:
                     logger.info(f"Adding missing column '{column_name}' to 'cleanups' table")
                     connection.execute(text(f"ALTER TABLE cleanups ADD COLUMN {column_name} {definition}"))
+            # Upgrade before/after image URLs to TEXT on PostgreSQL
+            if engine.dialect.name == "postgresql":
+                try:
+                    connection.execute(text("ALTER TABLE cleanups ALTER COLUMN before_image_url TYPE TEXT;"))
+                    connection.execute(text("ALTER TABLE cleanups ALTER COLUMN after_image_url TYPE TEXT;"))
+                except Exception as exc:
+                    logger.warning(f"Could not alter cleanups image columns type: {exc}")

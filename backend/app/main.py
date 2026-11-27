@@ -3,12 +3,13 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -156,7 +157,48 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-app.mount("/static/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+FALLBACK_EVIDENCE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <linearGradient id="v_bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10241B"/>
+      <stop offset="50%" stop-color="#1B4332"/>
+      <stop offset="100%" stop-color="#092421"/>
+    </linearGradient>
+    <linearGradient id="v_accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#52B788"/>
+      <stop offset="100%" stop-color="#74D7CB"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#v_bg)" rx="16"/>
+  <circle cx="200" cy="105" r="46" fill="#092421" opacity="0.6"/>
+  <circle cx="200" cy="105" r="42" fill="none" stroke="url(#v_accent)" stroke-width="2.5" stroke-dasharray="5 3"/>
+  <path d="M185 97 L192 89 L208 89 L215 97 L225 97 C228 97 230 99 230 102 L230 122 C230 125 228 127 225 127 L175 127 C172 127 170 125 170 122 L170 102 C170 99 172 97 175 97 Z" fill="none" stroke="#DEF5F1" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="200" cy="111" r="10" fill="none" stroke="#74D7CB" stroke-width="2.5"/>
+  <text x="200" y="178" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="800" fill="#DEF5F1" text-anchor="middle" letter-spacing="1">VASUNDHARA AI</text>
+  <text x="200" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#98E0D5" text-anchor="middle">Field Photographic Evidence</text>
+  <rect x="110" y="222" width="180" height="26" rx="13" fill="#092421" stroke="#27403C" stroke-width="1"/>
+  <circle cx="126" cy="235" r="4" fill="#52B788"/>
+  <text x="204" y="239" font-family="monospace" font-size="11" font-weight="700" fill="#74D7CB" text-anchor="middle">Evidence Logged</text>
+</svg>"""
+
+
+@app.get("/static/uploads/{filename:path}")
+async def serve_uploaded_file(filename: str):
+    clean_name = Path(filename).name
+    if not clean_name or clean_name in {".", ".."} or ".." in filename or "%2e" in filename.lower():
+        raise HTTPException(status_code=400, detail="Invalid file path.")
+    target = (UPLOAD_DIR / clean_name).resolve()
+    if target.parent == UPLOAD_DIR.resolve() and target.is_file():
+        return FileResponse(target)
+    # Resilient fallback: return branded vector SVG with 200 OK so ephemeral restarts never cause broken thumbnails
+    return Response(
+        content=FALLBACK_EVIDENCE_SVG,
+        media_type="image/svg+xml",
+        headers={
+            "Content-Type": "image/svg+xml",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
 
 
 @app.get("/health")

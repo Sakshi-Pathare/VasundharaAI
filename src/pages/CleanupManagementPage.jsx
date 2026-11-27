@@ -606,11 +606,23 @@ export function CleanupManagementPage() {
                   </div>
                   <div className="h-64 rounded-2xl overflow-hidden bg-slate-100 border-2 border-rose-200 shadow-soft relative group">
                     {selectedTask.beforeImageUrl ? (
-                      <img
-                        src={selectedTask.beforeImageUrl}
-                        alt="Before Cleanup"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
+                      <>
+                        <img
+                          src={selectedTask.beforeImageUrl}
+                          alt="Before Cleanup"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.parentElement.querySelector('.before-img-fallback');
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                        <div className="before-img-fallback hidden w-full h-full bg-gradient-to-br from-[#10241B] to-[#1B4332] flex-col items-center justify-center p-6 text-center select-none text-white">
+                          <Camera className="w-10 h-10 text-[#EF4444] mb-2" />
+                          <h4 className="font-bold text-sm text-[#DEF5F1]">Original Incident Evidence</h4>
+                          <p className="text-xs text-[#98E0D5] mt-1 font-mono">{selectedTask.id}</p>
+                        </div>
+                      </>
                     ) : (
                       <div className="h-full flex items-center justify-center text-xs text-charcoal-400">
                         No before photo recorded
@@ -634,11 +646,23 @@ export function CleanupManagementPage() {
                   </div>
                   <div className="h-64 rounded-2xl overflow-hidden bg-slate-100 border-2 border-forest-200 shadow-soft relative group">
                     {selectedTask.afterImageUrl ? (
-                      <img
-                        src={selectedTask.afterImageUrl}
-                        alt="After Cleanup Evidence"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
+                      <>
+                        <img
+                          src={selectedTask.afterImageUrl}
+                          alt="After Cleanup Evidence"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.parentElement.querySelector('.after-img-fallback');
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                        <div className="after-img-fallback hidden w-full h-full bg-gradient-to-br from-[#10241B] via-[#1B4332] to-[#092421] flex-col items-center justify-center p-6 text-center select-none text-white">
+                          <CheckCircle2 className="w-10 h-10 text-[#52B788] mb-2" />
+                          <h4 className="font-bold text-sm text-[#DEF5F1]">Site Restored &amp; Cleared</h4>
+                          <p className="text-xs text-[#98E0D5] mt-1">Verified Municipal Clearance Evidence</p>
+                        </div>
+                      </>
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center text-xs text-charcoal-400 p-6 text-center space-y-3 bg-slate-50">
                         <Camera className="w-8 h-8 text-charcoal-300" />

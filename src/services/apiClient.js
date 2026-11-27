@@ -92,8 +92,12 @@ export function resolveAssetUrl(url) {
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
-  // If running directly with an external API host defined
-  const externalOrigin = import.meta.env.VITE_API_ORIGIN;
+  // If running directly with an external API host defined, or on deployed Vercel instance
+  const externalOrigin =
+    import.meta.env.VITE_API_ORIGIN ||
+    (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+      ? 'https://vasundharaai.onrender.com'
+      : '');
   if (externalOrigin && url.startsWith('/static/')) {
     return `${externalOrigin.replace(/\/$/, '')}${url}`;
   }

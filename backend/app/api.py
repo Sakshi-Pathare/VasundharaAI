@@ -322,6 +322,10 @@ def _image_url(value: str | None, key: str) -> str | None:
         raise HTTPException(status_code=400, detail="Invalid destination path.")
     if not target.exists():
         target.write_bytes(content)
+    # Persist Base64 Data URI directly in database records when within 1.5MB threshold
+    # so images survive server restarts, cold boots, and ephemeral deployments permanently.
+    if len(value) <= 1_500_000:
+        return value
     return f"/static/uploads/{file_name}"
 
 
@@ -1242,10 +1246,18 @@ def create_report(
     image_url = _image_url(payload.image_url, report_id)
     detections = []
     detection_note = "AI detector not configured; report classification is user-provided."
-    if image_url and image_url.startswith("/static/uploads/"):
-        img_name = Path(image_url).name
-        target = (UPLOAD_DIR / img_name).resolve()
-        if target.parent == UPLOAD_DIR.resolve() and target.is_file():
+    if image_url:
+        target = None
+        if image_url.startswith("/static/uploads/"):
+            img_name = Path(image_url).name
+            target = (UPLOAD_DIR / img_name).resolve()
+        else:
+            # Locate file matching report_id written by _image_url
+            matches = list(UPLOAD_DIR.glob(f"{report_id}-*")) if UPLOAD_DIR.exists() else []
+            if matches:
+                target = matches[0]
+
+        if target and target.parent == UPLOAD_DIR.resolve() and target.is_file():
             try:
                 detections, detection_note = detect_objects(target)
             except Exception as exc:
@@ -1502,8 +1514,28 @@ def run_vision_detect(
             raise HTTPException(status_code=400, detail="Report does not contain an image.")
         if report.image_url.startswith("/static/uploads/"):
             image_path = (UPLOAD_DIR / Path(report.image_url).name).resolve()
+        elif report.image_url.startswith("data:image/"):
+            matches = list(UPLOAD_DIR.glob(f"{report.id}-*")) if UPLOAD_DIR.exists() else []
+            if matches and matches[0].is_file():
+                image_path = matches[0]
+            else:
+                try:
+                    _, encoded = report.image_url.split(",", 1)
+                    raw_b = base64.b64decode(encoded)
+                    image_path = (UPLOAD_DIR / f"{report.id}-cached.jpg").resolve()
+                    image_path.write_bytes(raw_b)
+                except Exception:
+                    image_path = None
     elif payload.image_url and payload.image_url.startswith("/static/uploads/"):
         image_path = (UPLOAD_DIR / Path(payload.image_url).name).resolve()
+    elif payload.image_url and payload.image_url.startswith("data:image/"):
+        try:
+            _, encoded = payload.image_url.split(",", 1)
+            raw_b = base64.b64decode(encoded)
+            image_path = (UPLOAD_DIR / f"temp-triage-{uuid.uuid4().hex[:8]}.jpg").resolve()
+            image_path.write_bytes(raw_b)
+        except Exception:
+            image_path = None
 
     if not image_path or image_path.parent != UPLOAD_DIR.resolve() or not image_path.is_file():
         raise HTTPException(status_code=400, detail="A valid uploaded local image path or report ID is required.")

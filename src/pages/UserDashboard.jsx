@@ -191,16 +191,30 @@ export function UserDashboard() {
                   <Card key={report.id} hover className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
                       {report.imageUrl ? (
-                        <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 bg-[#E5EDE5] border border-[#CCDCCC] shadow-xs">
+                        <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 bg-[#E5EDE5] border border-[#CCDCCC] shadow-xs relative">
                           <img
                             src={report.imageUrl}
                             alt={report.title}
                             className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.parentElement.querySelector('.dash-img-fallback');
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
                           />
+                          <div className="dash-img-fallback hidden w-full h-full bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9] flex-col items-center justify-center p-1.5 text-center select-none">
+                            <Camera className="w-5 h-5 text-[#1B4332] mb-0.5" />
+                            <span className="text-[8px] font-extrabold text-[#10241B] leading-tight line-clamp-1">
+                              {getCategoryLabel ? getCategoryLabel(report.category) : report.category}
+                            </span>
+                          </div>
                         </div>
                       ) : (
-                        <div className="w-20 h-20 rounded-2xl bg-[#DEF5F1] text-[#10241B] flex items-center justify-center shrink-0">
-                          <Camera className="w-6 h-6" />
+                        <div className="w-20 h-20 rounded-2xl bg-[#DEF5F1] text-[#10241B] flex flex-col items-center justify-center shrink-0 border border-[#CCDCCC] p-1.5 text-center">
+                          <Camera className="w-5 h-5 mb-0.5" />
+                          <span className="text-[8px] font-extrabold text-[#10241B] leading-tight line-clamp-1">
+                            {getCategoryLabel ? getCategoryLabel(report.category) : report.category}
+                          </span>
                         </div>
                       )}
 

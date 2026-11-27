@@ -194,16 +194,30 @@ export function MyReportsPage() {
               >
                 <div className="flex items-start gap-4">
                   {report.imageUrl ? (
-                    <div className="w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-sage-100 border border-sage-200 shadow-xs">
+                    <div className="w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-[#E5EDE5] border border-[#CCDCCC] shadow-xs relative">
                       <img
                         src={report.imageUrl}
                         alt={report.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.parentElement.querySelector('.report-img-fallback');
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
                       />
+                      <div className="report-img-fallback hidden w-full h-full bg-gradient-to-br from-[#E8F5E9] to-[#C8E6C9] flex-col items-center justify-center p-2 text-center select-none">
+                        <Camera className="w-6 h-6 text-[#1B4332] mb-1" />
+                        <span className="text-[9px] font-extrabold text-[#10241B] leading-tight line-clamp-2">
+                          {getCategoryLabel(report.category)}
+                        </span>
+                      </div>
                     </div>
                   ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-sage-100 text-forest-700 flex items-center justify-center shrink-0">
-                      <Camera className="w-8 h-8" />
+                    <div className="w-24 h-24 rounded-2xl bg-[#E5EDE5] text-[#1B4332] flex flex-col items-center justify-center shrink-0 border border-[#CCDCCC] p-2 text-center">
+                      <Camera className="w-6 h-6 mb-1" />
+                      <span className="text-[9px] font-extrabold text-[#10241B] leading-tight">
+                        {getCategoryLabel(report.category)}
+                      </span>
                     </div>
                   )}
 

@@ -74,11 +74,23 @@ export function DetectionOverlay({
       {/* Image Container with Bounding Box SVG/HTML Overlay */}
       <div className="relative rounded-2xl overflow-hidden bg-black/5 border border-sage-200 shadow-soft group select-none">
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt="Incident Evidence"
-            className="w-full h-auto max-h-96 object-contain block mx-auto"
-          />
+          <>
+            <img
+              src={imageUrl}
+              alt="Incident Evidence"
+              className="w-full h-auto max-h-96 object-contain block mx-auto"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fallback = e.currentTarget.parentElement.querySelector('.overlay-img-fallback');
+                if (fallback) fallback.style.display = 'flex';
+              }}
+            />
+            <div className="overlay-img-fallback hidden h-56 w-full bg-gradient-to-br from-[#10241B] via-[#1B4332] to-[#092421] flex-col items-center justify-center p-6 text-center select-none text-white">
+              <Camera className="w-10 h-10 text-[#74D7CB] mb-2" />
+              <h4 className="font-bold text-sm text-[#DEF5F1] tracking-wide">Vasundhara AI • Civic Evidence Record</h4>
+              <p className="text-xs text-[#98E0D5] mt-1">Field photograph logged and registered in municipal ledger</p>
+            </div>
+          </>
         ) : (
           <div className="h-48 flex items-center justify-center text-charcoal-400 text-xs">
             No image attached
