@@ -1,0 +1,115 @@
+# ==============================================================================
+# Vasundhara AI (EcoWatch AI) — Hardened Production Docker Compose
+# Architecture:
+# - Frontend: Nginx on 80/443 (Only service publicly exposed)
+# - Backend: Uvicorn ASGI on internal network only (no exposed ports)
+# - Database: PostgreSQL 16 on internal network only (no exposed ports)
+# - Logging: Rotating JSON logs with size caps to prevent disk exhaustion
+# - Storage: Persistent named volumes for PGDATA, uploads, and AI weights
+# ==============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: vasundhara_db_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - vasundhara_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: vasundhara_backend_prod
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      API_HOST: 0.0.0.0
+      API_PORT: 8001
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      UPLOAD_DIR: /app/uploads
+      MAX_IMAGE_BYTES: 8388608
+      ECOWATCH_SUPERADMIN_EMAIL: ${ECOWATCH_SUPERADMIN_EMAIL}
+      ECOWATCH_SUPERADMIN_PASSWORD: ${ECOWATCH_SUPERADMIN_PASSWORD}
+      LOG_LEVEL: INFO
+    volumes:
+      - uploads_prod:/app/uploads
+      - models_prod:/app/models
+      - backups_prod:/app/backups
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    networks:
+      - vasundhara_internal
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: vasundhara_frontend_prod
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - vasundhara_internal
+
+volumes:
+  pgdata_prod:
+    name: vasundhara_pgdata_prod
+  uploads_prod:
+    name: vasundhara_uploads_prod
+  models_prod:
+    name: vasundhara_models_prod
+  backups_prod:
+    name: vasundhara_backups_prod
+
+networks:
+  vasundhara_internal:
+    driver: bridge

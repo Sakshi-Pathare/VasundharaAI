@@ -1,0 +1,87 @@
+services:
+  # ============================================================================
+  # PostgreSQL Relational Database Service
+  # ============================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: vasundhara_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vasundhara_db}
+      POSTGRES_USER: ${POSTGRES_USER:-vasundhara_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vasundhara_dev_pass_2026}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vasundhara_user} -d ${POSTGRES_DB:-vasundhara_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vasundhara_net
+
+  # ============================================================================
+  # FastAPI ASGI Backend Service
+  # ============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: vasundhara_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      API_HOST: 0.0.0.0
+      API_PORT: 8001
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vasundhara_user}:${POSTGRES_PASSWORD:-vasundhara_dev_pass_2026}@db:5432/${POSTGRES_DB:-vasundhara_db}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000,http://127.0.0.1:3000}
+      UPLOAD_DIR: /app/uploads
+      MAX_IMAGE_BYTES: 8388608
+      ECOWATCH_SUPERADMIN_EMAIL: ${ECOWATCH_SUPERADMIN_EMAIL:-admin@vasundhara.eco}
+      ECOWATCH_SUPERADMIN_PASSWORD: ${ECOWATCH_SUPERADMIN_PASSWORD:-VasundharaAdmin2026!}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - uploads_data:/app/uploads
+      - models_data:/app/models
+      - backups_data:/app/backups
+    ports:
+      - "8001:8001"
+    networks:
+      - vasundhara_net
+
+  # ============================================================================
+  # Nginx Reverse Proxy & React SPA Frontend Service
+  # ============================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: vasundhara_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - vasundhara_net
+
+volumes:
+  pgdata:
+    name: vasundhara_pgdata
+  uploads_data:
+    name: vasundhara_uploads
+  models_data:
+    name: vasundhara_models
+  backups_data:
+    name: vasundhara_backups
+
+networks:
+  vasundhara_net:
+    driver: bridge
