@@ -1650,6 +1650,157 @@ def test_database_driven_analytics_dashboard_metrics_and_trends():
         assert pcmc_m["cleanupTasks"] == 0
 
 
+def test_security_validation_reliability_and_file_safety_audit():
+    """
+    Prompt 13 — Comprehensive Security, Validation and Reliability Audit Test Suite:
+    - Unauthorized access rejection (401)
+    - Privilege escalation defense for citizen & municipal admin (403)
+    - Malicious file uploads: empty, spoofed executable, SVG XSS, oversized (>8MB)
+    - Path traversal and dangerous URI scheme prevention in image URLs
+    - Input validation on geospatial boundaries and blank values (422)
+    - Immediate token revocation upon session logout
+    - Rate-limiting lockout with Retry-After header
+    - Request tracking middleware with X-Request-ID and security headers
+    - Readiness probe (/ready) and liveness probe (/health)
+    """
+    with TestClient(app) as client:
+        # 1. Unauthorized Access to Protected Endpoints (401)
+        for method, path in [
+            ("GET", "/api/v1/auth/me"),
+            ("GET", "/api/v1/reports/history"),
+            ("POST", "/api/v1/reports"),
+            ("GET", "/api/v1/cleanups"),
+            ("GET", "/api/v1/analytics/metrics"),
+            ("GET", "/api/v1/superadmin/audit"),
+            ("POST", "/api/v1/superadmin/municipalities"),
+            ("POST", "/api/v1/uploads"),
+        ]:
+            resp = client.get(path) if method == "GET" else client.post(path, json={})
+            assert resp.status_code in {401, 403}, f"Expected 401/403 for {method} {path}, got {resp.status_code}"
+            assert "error" in resp.json() or "detail" in resp.json()
+
+        # 2. Privilege Escalation Defense (403)
+        citizen_headers = register_citizen(client, "audit.citizen@example.test")
+        pmc_admin_headers = login(client, "pmc@example.test", "PMC-test-password-2026")
+
+        # Citizen cannot access superadmin audit, cleanups, or ward stats
+        assert client.get("/api/v1/superadmin/audit", headers=citizen_headers).status_code == 403
+        assert client.get("/api/v1/cleanups", headers=citizen_headers).status_code == 403
+        assert client.get("/api/v1/admin/ward-stats", headers=citizen_headers).status_code == 403
+
+        # Municipal admin cannot access superadmin municipality creation
+        muni_payload = {
+            "code": "BMC",
+            "name": "Brihanmumbai Municipal Corporation",
+            "boundarySource": "Test",
+            "boundaryGeojson": rectangle(72.8, 18.9, 73.0, 19.2),
+        }
+        assert client.post("/api/v1/superadmin/municipalities", json=muni_payload, headers=pmc_admin_headers).status_code == 403
+
+        # 3. Malicious File Upload Security
+        # Empty file
+        res_empty = client.post(
+            "/api/v1/uploads",
+            files={"file": ("empty.jpg", b"", "image/jpeg")},
+            headers=pmc_admin_headers,
+        )
+        assert res_empty.status_code == 400
+        assert "empty" in res_empty.json()["detail"].lower()
+
+        # Spoofed executable
+        res_spoof = client.post(
+            "/api/v1/uploads",
+            files={"file": ("malware.jpg", b"#!/bin/bash\necho evil", "image/jpeg")},
+            headers=pmc_admin_headers,
+        )
+        assert res_spoof.status_code == 400
+        assert "allowed image types" in res_spoof.json()["detail"].lower()
+
+        # SVG script payload (XSS prevention)
+        res_svg = client.post(
+            "/api/v1/uploads",
+            files={"file": ("vector.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert('XSS')</script></svg>", "image/svg+xml")},
+            headers=pmc_admin_headers,
+        )
+        assert res_svg.status_code == 400
+
+        # Oversized file (> 8MB)
+        huge_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * (8 * 1024 * 1024 + 200_000)
+        res_huge = client.post(
+            "/api/v1/uploads",
+            files={"file": ("oversized.jpg", huge_bytes, "image/jpeg")},
+            headers=pmc_admin_headers,
+        )
+        assert res_huge.status_code == 413
+
+        # 4. Path Traversal & Dangerous Schemes in Report URLs
+        res_trav = client.post(
+            "/api/v1/reports",
+            json={"title": "Traversal", "latitude": 18.50, "longitude": 73.95, "imageUrl": "/static/uploads/../../etc/passwd"},
+            headers=citizen_headers,
+        )
+        assert res_trav.status_code == 400
+
+        for dangerous_url in ["javascript:alert(1)", "file:///etc/passwd", "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="]:
+            res_scheme = client.post(
+                "/api/v1/reports",
+                json={"title": "Bad Scheme", "latitude": 18.50, "longitude": 73.95, "imageUrl": dangerous_url},
+                headers=citizen_headers,
+            )
+            assert res_scheme.status_code == 400
+
+        # 5. Input Validation on Coordinates and Boundaries (422)
+        res_lat = client.post("/api/v1/reports", json={"title": "Lat", "latitude": 95.0, "longitude": 73.95}, headers=citizen_headers)
+        assert res_lat.status_code == 422
+
+        res_lng = client.post("/api/v1/reports", json={"title": "Lng", "latitude": 18.50, "longitude": -195.0}, headers=citizen_headers)
+        assert res_lng.status_code == 422
+
+        res_blank = client.post("/api/v1/reports", json={"title": "   ", "latitude": 18.50, "longitude": 73.95}, headers=citizen_headers)
+        assert res_blank.status_code == 422
+
+        # 6. Session Revocation on Logout
+        citizen_login_resp = client.post("/api/v1/auth/login", json={"email": "audit.citizen@example.test", "password": "citizen-test-password-2026"})
+        assert citizen_login_resp.status_code == 200
+        c_token = citizen_login_resp.json()["accessToken"]
+        c_headers = {"Authorization": f"Bearer {c_token}"}
+
+        # Verify active session works
+        assert client.get("/api/v1/auth/me", headers=c_headers).status_code == 200
+
+        # Revoke session via logout
+        logout_resp = client.post("/api/v1/auth/logout", headers=c_headers)
+        assert logout_resp.status_code == 204
+
+        # Token is immediately rejected
+        assert client.get("/api/v1/auth/me", headers=c_headers).status_code == 401
+
+        # 7. Rate Limiting Lockout
+        for _ in range(5):
+            bad_login = client.post("/api/v1/auth/login", json={"email": "audit.citizen@example.test", "password": "WrongPassword!"})
+            assert bad_login.status_code == 401
+
+        locked_login = client.post("/api/v1/auth/login", json={"email": "audit.citizen@example.test", "password": "WrongPassword!"})
+        assert locked_login.status_code == 429
+        assert "retry-after" in locked_login.headers
+
+        # 8. Request Tracking & Security Headers
+        health_resp = client.get("/health")
+        assert health_resp.status_code == 200
+        assert "x-request-id" in health_resp.headers
+        assert health_resp.headers["x-content-type-options"] == "nosniff"
+        assert health_resp.headers["x-frame-options"] == "DENY"
+        assert health_resp.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+
+        # 9. Readiness Probe
+        ready_resp = client.get("/ready")
+        assert ready_resp.status_code == 200
+        ready_data = ready_resp.json()
+        assert ready_data["status"] == "ready"
+        assert ready_data["checks"]["database"] is True
+        assert ready_data["checks"]["storage"] is True
+
+
 
 
 

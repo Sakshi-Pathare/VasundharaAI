@@ -40,6 +40,8 @@ backend/.venv/
 .pytest_cache/
 backend/uploads/*
 !backend/uploads/.gitkeep
+backend/backups/*
+!backend/backups/.gitkeep
 
 # Legacy / Subdirectory junctions
 EcoWatchAI-main/

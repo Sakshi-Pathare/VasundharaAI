@@ -57,13 +57,13 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Dependency generator yielding an active database session."""
+    """Dependency generator yielding an active database session with automatic error rollback."""
     db = SessionLocal()
     try:
         yield db
-    except (OperationalError, DBAPIError) as db_err:
-        logger.error(f"Database operational error encountered: {db_err}")
+    except Exception as exc:
         db.rollback()
+        logger.error(f"Database session rolled back due to error: {exc}")
         raise
     finally:
         db.close()

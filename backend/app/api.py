@@ -279,13 +279,29 @@ def _image_url(value: str | None, key: str) -> str | None:
     if not value:
         return None
     if value.startswith("/static/uploads/"):
+        if ".." in value or "%2e%2e" in value.lower():
+            raise HTTPException(status_code=400, detail="Path traversal detected in image reference.")
         clean_name = Path(value).name
+        if not clean_name or clean_name in {".", ".."}:
+            raise HTTPException(status_code=400, detail="Invalid image file name reference.")
         target = (UPLOAD_DIR / clean_name).resolve()
         if target.parent != UPLOAD_DIR.resolve():
             raise HTTPException(status_code=400, detail="Path traversal detected in image reference.")
         return f"/static/uploads/{clean_name}"
+
     if not value.startswith("data:"):
-        return value
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image URL format. Only local /static/uploads/, safe HTTP(S), or Base64 data:image URIs are permitted."
+        )
+
+    if not value.startswith("data:image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only data:image/ formats (JPEG, PNG, WebP) are permitted. Embedded scripts or HTML are rejected."
+        )
 
     try:
         header, encoded = value.split(",", 1)
@@ -312,7 +328,12 @@ def _image_url(value: str | None, key: str) -> str | None:
 def _remove_local_image(url: str | None) -> None:
     if not url or not url.startswith("/static/uploads/"):
         return
-    target = (UPLOAD_DIR / Path(url).name).resolve()
+    if ".." in url or "%2e%2e" in url.lower():
+        return
+    clean_name = Path(url).name
+    if not clean_name or clean_name in {".", ".."}:
+        return
+    target = (UPLOAD_DIR / clean_name).resolve()
     if target.parent == UPLOAD_DIR.resolve() and target.is_file():
         target.unlink()
 
