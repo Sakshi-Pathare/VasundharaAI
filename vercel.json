@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/v1/health",
+      "destination": "https://vasundharaai.onrender.com/health"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "https://vasundharaai.onrender.com/api/$1"
     },
@@ -18,3 +22,4 @@
     }
   ]
 }
+
