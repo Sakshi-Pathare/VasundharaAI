@@ -854,6 +854,12 @@ export function CleanupManagementPage() {
         maxWidth="max-w-lg"
       >
         <form onSubmit={handleSubmitEvidence} className="space-y-4 text-xs font-sans">
+          {errorMessage && (
+            <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
           <div className="p-3 bg-[#DEF5F1] rounded-xl border border-[#98E0D5] text-[#092421] space-y-1">
             <p className="font-bold flex items-center gap-1.5">
               <Camera className="w-4 h-4 text-[#1B4A45]" />
@@ -886,7 +892,6 @@ export function CleanupManagementPage() {
                   <input
                     type="file"
                     accept="image/*"
-                    required
                     className="hidden"
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
