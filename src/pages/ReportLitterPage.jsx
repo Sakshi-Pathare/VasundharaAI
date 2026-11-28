@@ -382,7 +382,7 @@ export function ReportLitterPage() {
                     </p>
                   </div>
                   <span className="font-mono text-[11px] font-bold text-[#1B4A45] bg-white px-2.5 py-1 rounded-md border border-sage-200">
-                    GPS: {submittedReport.latitude?.toFixed(5)}°, {submittedReport.longitude?.toFixed(5)}°
+                    GPS: {Number(submittedReport.latitude || 0).toFixed(5)}°, {Number(submittedReport.longitude || 0).toFixed(5)}°
                   </span>
                 </div>
                 <div className="flex items-center gap-3 pt-1 text-[11px]">
@@ -774,7 +774,7 @@ export function ReportLitterPage() {
                     {formData.address || 'Geo-coordinate location'}
                   </p>
                   <div className="flex items-center gap-2 text-[10px] font-mono text-[#1B4A45]">
-                    <span className="font-bold">GPS: {formData.latitude?.toFixed(4)}°, {formData.longitude?.toFixed(4)}°</span>
+                    <span className="font-bold">GPS: {Number(formData.latitude || 0).toFixed(4)}°, {Number(formData.longitude || 0).toFixed(4)}°</span>
                     <span>•</span>
                     <span className="capitalize font-bold">{formData.category} ({formData.severity})</span>
                     <span>•</span>

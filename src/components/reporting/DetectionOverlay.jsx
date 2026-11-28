@@ -12,6 +12,7 @@ import {
   Check,
   Info,
   Clock,
+  Camera,
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';

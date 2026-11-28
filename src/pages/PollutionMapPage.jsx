@@ -17,6 +17,7 @@ import {
   Scale,
   Calendar,
   Share2,
+  Camera,
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { Card, CardBody } from '../components/common/Card';
